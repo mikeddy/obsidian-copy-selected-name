@@ -3,7 +3,7 @@
   "name": "Copy Selected Name",
   "version": "1.6.0",
   "minAppVersion": "1.4.5",
-  "description": "Copy selected files or folders as editable @mentions with Alt+C, with append mode, history, and Obsidian URL conversion.",
+  "description": "Copy selected files or folders as editable @mentions with Alt+C, with append mode, history, and vault URL conversion.",
   "author": "mikeddy",
   "authorUrl": "https://github.com/mikeddy",
   "isDesktopOnly": true

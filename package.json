@@ -1,7 +1,7 @@
 {
   "name": "obsidian-copy-selected-name",
   "version": "1.6.0",
-  "description": "Copy selected Obsidian files or folders as editable @mentions with Alt+C, with append mode, history, and Obsidian URL conversion.",
+  "description": "Copy selected files or folders as editable @mentions with Alt+C, with append mode, history, and vault URL conversion.",
   "main": "main.js",
   "scripts": {
     "check": "node --check main.js"
