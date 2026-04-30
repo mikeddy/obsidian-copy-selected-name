@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" role="img" aria-labelledby="title desc">
+  <title id="title">Overwrite and append modal</title>
+  <desc id="desc">Mockup of the modal opened by triple Alt+C or append-chain single press.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <rect width="960" height="620" fill="#eef2f7"/>
+  <rect x="0" y="0" width="960" height="620" fill="#0f172a" opacity="0.12"/>
+  <rect x="220" y="54" width="520" height="512" rx="12" fill="#ffffff" stroke="#d4dbe7" filter="url(#shadow)"/>
+  <rect x="246" y="80" width="468" height="164" rx="8" fill="#ffffff" stroke="#d8dee9"/>
+  <text x="266" y="112" font-family="Arial, Microsoft YaHei, sans-serif" font-size="17" font-weight="700" fill="#0f172a">剪贴板内容</text>
+  <rect x="266" y="132" width="116" height="30" rx="6" fill="#2563eb"/>
+  <text x="284" y="152" font-family="Arial, Microsoft YaHei, sans-serif" font-size="12" fill="#ffffff">转成 URL</text>
+  <rect x="392" y="132" width="148" height="30" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="406" y="152" font-family="Arial, Microsoft YaHei, sans-serif" font-size="12" fill="#334155">转成 URL并复制</text>
+  <rect x="550" y="132" width="48" height="30" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="562" y="152" font-family="Arial, Microsoft YaHei, sans-serif" font-size="12" fill="#334155">清空</text>
+  <rect x="266" y="174" width="418" height="48" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="284" y="204" font-family="Consolas, monospace" font-size="15" fill="#0f172a">@A文件.md @B文件.md</text>
+  <text x="246" y="292" font-family="Arial, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#0f172a">这次 Alt+C 怎么处理？</text>
+  <rect x="246" y="318" width="468" height="58" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="266" y="353" font-family="Consolas, monospace" font-size="16" fill="#0f172a">@C文件.md</text>
+  <rect x="246" y="402" width="76" height="36" rx="6" fill="#2563eb"/>
+  <text x="269" y="425" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#ffffff">覆盖</text>
+  <rect x="334" y="402" width="76" height="36" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="357" y="425" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#334155">追加</text>
+  <rect x="246" y="474" width="76" height="36" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="269" y="497" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#334155">取消</text>
+  <rect x="614" y="474" width="100" height="36" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="636" y="497" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#334155">历史记录</text>
+  <path d="M748 160h90" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="766" y="135" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#475569">同一个弹框会复用</text>
+  <text x="766" y="187" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#475569">顶部引用同一份剪贴板</text>
+</svg>

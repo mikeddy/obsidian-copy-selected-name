@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">History edit panel</title>
+  <desc id="desc">Mockup of copy history with edit and save controls.</desc>
+  <rect width="960" height="560" fill="#f6f8fb"/>
+  <rect x="150" y="58" width="660" height="444" rx="12" fill="#ffffff" stroke="#d8dee9"/>
+  <text x="184" y="104" font-family="Arial, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#0f172a">历史记录</text>
+  <line x1="184" y1="128" x2="776" y2="128" stroke="#d8dee9"/>
+  <text x="184" y="166" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#64748b">2026/4/30 10:21:08</text>
+  <text x="184" y="198" font-family="Consolas, monospace" font-size="17" fill="#0f172a">@01_抖音拆解.md @02_账号定位.md</text>
+  <rect x="626" y="162" width="58" height="34" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="641" y="184" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" fill="#334155">复制</text>
+  <rect x="694" y="162" width="58" height="34" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="709" y="184" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" fill="#334155">编辑</text>
+  <line x1="184" y1="226" x2="776" y2="226" stroke="#e2e8f0"/>
+  <text x="184" y="264" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#64748b">2026/4/30 10:24:42</text>
+  <rect x="184" y="282" width="410" height="96" rx="6" fill="#f8fafc" stroke="#94a3b8"/>
+  <text x="204" y="316" font-family="Consolas, monospace" font-size="17" fill="#0f172a">@03_脚本模板.md</text>
+  <text x="204" y="350" font-family="Consolas, monospace" font-size="17" fill="#0f172a">@04_素材清单.md</text>
+  <rect x="626" y="304" width="58" height="34" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="641" y="326" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" fill="#334155">复制</text>
+  <rect x="694" y="304" width="58" height="34" rx="6" fill="#2563eb"/>
+  <text x="709" y="326" font-family="Arial, Microsoft YaHei, sans-serif" font-size="14" fill="#ffffff">保存</text>
+  <path d="M420 422h170" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M584 416l14 8-14 8z" fill="#94a3b8"/>
+  <text x="184" y="428" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#475569">点“编辑”后，记录变成文本框；再点“保存”即可改写历史内容。</text>
+</svg>

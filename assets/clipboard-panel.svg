@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">Copy Selected Name clipboard panel</title>
+  <desc id="desc">Mockup of the floating editable clipboard panel.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect width="960" height="560" rx="0" fill="#f6f8fb"/>
+  <rect x="64" y="48" width="832" height="464" rx="12" fill="#ffffff" stroke="#d8dee9"/>
+  <rect x="64" y="48" width="832" height="48" rx="12" fill="#eef4ff"/>
+  <text x="92" y="79" font-family="Arial, sans-serif" font-size="16" fill="#475569">Obsidian editor area</text>
+  <rect x="504" y="92" width="336" height="324" rx="8" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <text x="526" y="128" font-family="Arial, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#0f172a">剪贴板内容</text>
+  <rect x="796" y="108" width="26" height="26" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="804" y="127" font-family="Arial, sans-serif" font-size="18" fill="#334155">×</text>
+  <rect x="526" y="154" width="112" height="34" rx="6" fill="#2563eb"/>
+  <text x="543" y="176" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#ffffff">转成 URL</text>
+  <rect x="648" y="154" width="142" height="34" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="662" y="176" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#334155">转成 URL并复制</text>
+  <rect x="800" y="154" width="42" height="34" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="809" y="176" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#334155">清空</text>
+  <rect x="526" y="206" width="294" height="156" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="544" y="238" font-family="Consolas, monospace" font-size="18" fill="#0f172a">@01_抖音拆解.md</text>
+  <text x="544" y="270" font-family="Consolas, monospace" font-size="18" fill="#0f172a">@02_账号定位.md</text>
+  <text x="544" y="302" font-family="Consolas, monospace" font-size="18" fill="#0f172a">@03_脚本模板.md</text>
+  <rect x="812" y="214" width="5" height="86" rx="3" fill="#cbd5e1"/>
+  <path d="M224 224h190" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M408 218l14 8-14 8z" fill="#94a3b8"/>
+  <text x="116" y="222" font-family="Arial, Microsoft YaHei, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Alt+C 后自动弹出</text>
+  <text x="116" y="254" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#475569">可编辑、可清空、可转 URL</text>
+  <text x="116" y="282" font-family="Arial, Microsoft YaHei, sans-serif" font-size="15" fill="#475569">悬停或聚焦时不会自动消失</text>
+  <text x="526" y="390" font-family="Arial, Microsoft YaHei, sans-serif" font-size="13" fill="#64748b">3 秒无操作自动隐藏</text>
+</svg>
