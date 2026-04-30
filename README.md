@@ -15,6 +15,12 @@ Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中
 
 插件使用自己的内部剪贴板，不会默认覆盖系统剪贴板。只有点击“转成 ObsidianURL并复制”时，才会把内容写入系统剪贴板。
 
+## 联系方式
+
+微信：`abc7752abc`
+
+备注：问题反馈、建议、合作
+
 ## 界面预览
 
 ### 剪贴板内容面板
@@ -183,6 +189,12 @@ Copy Selected Name is an Obsidian desktop plugin for quickly turning selected fi
 ```
 
 It is designed for Obsidian-based AI workflows where you often need to reference notes, collect multiple files as context, insert file mentions into Claudian, or convert selected notes into Obsidian URLs.
+
+## Contact
+
+WeChat: `abc7752abc`
+
+For feedback, suggestions, and collaboration.
 
 ## Installation
 
