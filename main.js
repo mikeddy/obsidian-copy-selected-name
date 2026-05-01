@@ -30,10 +30,15 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.lastSelectedItems = [];
     this.lastPressAt = 0;
     this.lastPressText = "";
+    this.lastPressKey = "";
+    this.lastSingleSnapshotText = "";
+    this.lastSingleSnapshotLastKey = "";
+    this.lastSingleSnapshotForKey = "";
     this.pendingSingleTimer = null;
     this.pendingSingleRequest = null;
     this.chainActive = false;
     this.chainText = "";
+    this.chainLastKey = "";
     this.pressCount = 0;
     this.currentClipboardText = "";
     this.clipboardPanelEl = null;
@@ -76,7 +81,10 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
         }
 
         if (!checking) {
-          void this.performOverwrite(this.buildMentionText(selectedItems.map((item) => item.name)));
+          void this.performOverwrite(
+            this.buildMentionTextFromItems(selectedItems),
+            this.buildSelectionKey(selectedItems)
+          );
         }
 
         return true;
@@ -126,8 +134,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       event.stopImmediatePropagation();
     }
 
-    const text = this.buildMentionText(selectedItems.map((item) => item.name));
-    void this.handleMentionHotkey(text);
+    const text = this.buildMentionTextFromItems(selectedItems);
+    const selectionKey = this.buildSelectionKey(selectedItems);
+    void this.handleMentionHotkey(text, selectionKey);
   }
 
   isAltC(event) {
@@ -139,15 +148,16 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       !event.isComposing;
   }
 
-  async handleMentionHotkey(text) {
+  async handleMentionHotkey(text, selectionKey = text) {
     if (!text) {
       return;
     }
 
+    const pressKey = selectionKey || text;
     this.showClipboardPanel(this.chainActive && this.chainText ? this.chainText : text);
     const now = Date.now();
-    const isSameTextPress = text === this.lastPressText;
-    const isQuickPress = isSameTextPress && this.lastPressAt > 0 && now - this.lastPressAt < DOUBLE_PRESS_MS;
+    const isSameSelectionPress = pressKey === this.lastPressKey;
+    const isQuickPress = isSameSelectionPress && this.lastPressAt > 0 && now - this.lastPressAt < DOUBLE_PRESS_MS;
     this.pressCount = isQuickPress ? this.pressCount + 1 : 1;
     const isDoublePress = this.pressCount === 2;
     const isTriplePress = this.pressCount >= 3;
@@ -157,26 +167,36 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     }
 
     if (isTriplePress) {
-      this.openCopyModeModal(text);
+      this.openCopyModeModal(text, pressKey);
       this.pressCount = 0;
     } else if (isDoublePress) {
-      await this.performAppend(text, { duplicateStartsChainOnly: text === this.lastPressText });
+      const hasSnapshotForPress = this.lastSingleSnapshotForKey === pressKey;
+      await this.performAppend(text, {
+        baseText: hasSnapshotForPress ? this.lastSingleSnapshotText : "",
+        baseLastKey: hasSnapshotForPress ? this.lastSingleSnapshotLastKey : "",
+        selectionKey: pressKey,
+        duplicateStartsChainOnly: true
+      });
     } else if (this.chainActive) {
-      this.pendingSingleRequest = { text };
+      this.pendingSingleRequest = { text, selectionKey: pressKey };
       this.showClipboardPanel(this.chainText || text);
       this.pendingSingleTimer = window.setTimeout(() => {
         const request = this.pendingSingleRequest;
         this.clearPendingSingle();
         if (request) {
-          this.openCopyModeModal(request.text);
+          this.openCopyModeModal(request.text, request.selectionKey);
         }
       }, DOUBLE_PRESS_MS);
     } else {
-      await this.performOverwrite(text);
+      this.lastSingleSnapshotText = this.chainText || this.currentClipboardText || "";
+      this.lastSingleSnapshotLastKey = this.chainLastKey || "";
+      this.lastSingleSnapshotForKey = pressKey;
+      await this.performOverwrite(text, pressKey);
     }
 
     this.lastPressAt = now;
     this.lastPressText = text;
+    this.lastPressKey = pressKey;
   }
 
   clearPendingSingle() {
@@ -188,13 +208,13 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.pendingSingleRequest = null;
   }
 
-  openCopyModeModal(text) {
+  openCopyModeModal(text, selectionKey = "") {
     if (this.copyModeModal) {
-      this.copyModeModal.updateText(text);
+      this.copyModeModal.updateText(text, selectionKey);
       return;
     }
 
-    const modal = new CopyModeModal(this.app, this, text);
+    const modal = new CopyModeModal(this.app, this, text, selectionKey);
     this.copyModeModal = modal;
     modal.open();
   }
@@ -382,12 +402,25 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     return `${cleanNames.map((name) => `@${name}`).join(" ")} `;
   }
 
-  async performOverwrite(text) {
+  buildMentionTextFromItems(items) {
+    return this.buildMentionText(items.map((item) => item.path || item.name));
+  }
+
+  buildSelectionKey(items) {
+    return items
+      .map((item) => item.path || item.name)
+      .filter(Boolean)
+      .sort()
+      .join("\u001f");
+  }
+
+  async performOverwrite(text, selectionKey = "") {
     if (!text) {
       return;
     }
 
     this.chainText = text;
+    this.chainLastKey = selectionKey || text;
     this.chainActive = false;
     await this.outputText(text, { mode: "overwrite" });
   }
@@ -398,21 +431,33 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     }
 
     this.chainActive = true;
+    if (options.baseText) {
+      this.chainText = options.baseText;
+      this.chainLastKey = options.baseLastKey || "";
+    }
+
     if (!this.chainText) {
       this.chainText = text;
+      this.chainLastKey = options.selectionKey || text;
       await this.outputText(text, { mode: "append" });
       return;
     }
 
     const wouldDuplicateTail = this.textEndsWithMentionText(this.chainText, text);
-    if (wouldDuplicateTail && options.duplicateStartsChainOnly) {
+    const isSameTailSelection = options.selectionKey && this.chainLastKey
+      ? options.selectionKey === this.chainLastKey
+      : wouldDuplicateTail;
+    if (wouldDuplicateTail && isSameTailSelection && options.duplicateStartsChainOnly) {
       new Notice("Append mode started");
       return;
     }
 
     if (!wouldDuplicateTail) {
       this.chainText = this.appendMentionText(this.chainText, text);
+    } else if (!isSameTailSelection) {
+      this.chainText = this.appendMentionText(this.chainText, text);
     }
+    this.chainLastKey = options.selectionKey || text;
 
     await this.outputText(text, { mode: "append", chainText: this.chainText });
   }
@@ -464,9 +509,14 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.currentClipboardText = "";
     this.chainText = "";
     this.chainActive = false;
+    this.chainLastKey = "";
     this.pressCount = 0;
     this.lastPressAt = 0;
     this.lastPressText = "";
+    this.lastPressKey = "";
+    this.lastSingleSnapshotText = "";
+    this.lastSingleSnapshotLastKey = "";
+    this.lastSingleSnapshotForKey = "";
     this.syncClipboardEditors("");
     this.updateObsidianUrlToggleButtons();
     if (options.showNotice) {
@@ -843,10 +893,10 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
       const item = this.app.vault.getAbstractFileByPath(filePath);
       if (item) {
-        return item.name;
+        return item.path;
       }
 
-      return filePath.split("/").filter(Boolean).pop() || "";
+      return filePath;
     } catch (error) {
       return "";
     }
@@ -895,10 +945,11 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 };
 
 class CopyModeModal extends Modal {
-  constructor(app, plugin, text) {
+  constructor(app, plugin, text, selectionKey = "") {
     super(app);
     this.plugin = plugin;
     this.text = text;
+    this.selectionKey = selectionKey;
     this.historyVisible = false;
   }
 
@@ -911,8 +962,9 @@ class CopyModeModal extends Modal {
     this.plugin.handleCopyModeModalClosed(this);
   }
 
-  updateText(text) {
+  updateText(text, selectionKey = "") {
     this.text = text;
+    this.selectionKey = selectionKey;
     if (this.modalEl?.isConnected) {
       this.render();
     }
@@ -951,13 +1003,13 @@ class CopyModeModal extends Modal {
     const overwriteButton = actionRow.createEl("button", { text: "覆盖" });
     overwriteButton.addClass("mod-cta");
     overwriteButton.addEventListener("click", async () => {
-      await this.plugin.performOverwrite(this.text);
+      await this.plugin.performOverwrite(this.text, this.selectionKey);
       this.close();
     });
 
     const appendButton = actionRow.createEl("button", { text: "追加" });
     appendButton.addEventListener("click", async () => {
-      await this.plugin.performAppend(this.text);
+      await this.plugin.performAppend(this.text, { selectionKey: this.selectionKey });
       this.close();
     });
 
