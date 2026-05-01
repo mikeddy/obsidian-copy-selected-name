@@ -1,5 +1,11 @@
 # Copy Selected Name
 
+## 演示视频 / Demo Video
+
+<video src="assets/demo.mp4" controls width="100%" title="Copy Selected Name Obsidian plugin demo"></video>
+
+[如果视频没有直接显示，点击这里观看演示视频。 / Click here to watch the demo video if it does not render inline.](assets/demo.mp4)
+
 Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中选中文件或文件夹后，通过 `Alt+C` 快速生成适合 AI 对话和笔记上下文引用的文件名格式，例如：
 
 ```text
