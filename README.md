@@ -6,7 +6,7 @@
 
 [点击这里观看高清 MP4 演示视频。 / Click here to watch the full MP4 demo.](assets/demo.mp4)
 
-Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中选中文件或文件夹后，通过 `Alt+C` 快速生成适合 AI 对话和笔记上下文引用的文件名格式，例如：
+Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中选中文件或文件夹后，通过 `Alt+C`（macOS 为 `Option+C`）快速生成适合 AI 对话和笔记上下文引用的文件名格式，例如：
 
 ```text
 @01_抖音拆解.md 
@@ -99,7 +99,7 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 ### 单个文件
 
 1. 在 Obsidian 左侧文件列表里选中文件，例如 `01_抖音拆解.md`。
-2. 按 `Alt+C`。
+2. 按 `Alt+C`（macOS 为 `Option+C`）。
 3. 插件内部剪贴板会得到：
 
 ```text
@@ -114,7 +114,7 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 ### 多个文件
 
-选中多个文件后按 `Alt+C`，会一次性复制所有选中文件名：
+选中多个文件后按 `Alt+C`（macOS 为 `Option+C`），会一次性复制所有选中文件名：
 
 ```text
 @A文件.md @B文件.md @C文件.md 
@@ -122,15 +122,15 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 ### 单按、双按、三连按
 
-- 单按 `Alt+C`：覆盖插件内部剪贴板。
-- 1 秒内双按 `Alt+C`：进入追加逻辑，把新文件名追加到原内容后面。
-- 1 秒内三连按 `Alt+C`：打开“覆盖 / 追加 / 取消”弹窗。
+- 单按 `Alt+C`（macOS 为 `Option+C`）：覆盖插件内部剪贴板。
+- 1 秒内双按 `Alt+C`（macOS 为 `Option+C`）：进入追加逻辑，把新文件名追加到原内容后面。
+- 1 秒内三连按 `Alt+C`（macOS 为 `Option+C`）：打开“覆盖 / 追加 / 取消”弹窗。
 
 例如：
 
-1. 在 A 文件上双按 `Alt+C`。
+1. 在 A 文件上双按 `Alt+C`（macOS 为 `Option+C`）。
 2. 切换到 B 文件。
-3. 在 B 文件上双按 `Alt+C`。
+3. 在 B 文件上双按 `Alt+C`（macOS 为 `Option+C`）。
 4. 最终插件剪贴板会是：
 
 ```text
@@ -141,7 +141,7 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 如果 Claudian 插件界面已经打开，并且光标正处在 Claudian 输入框中：
 
-- 按 `Alt+C` 会把文件名引用直接插入光标所在位置。
+- 按 `Alt+C`（macOS 为 `Option+C`）会把文件名引用直接插入光标所在位置。
 - 同时更新插件内部剪贴板和右上角剪贴板面板。
 
 如果光标不在 Claudian 输入框中：
@@ -150,7 +150,7 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 ### 右上角剪贴板面板
 
-每次按 `Alt+C`，右上角都会弹出剪贴板面板。
+每次按 `Alt+C`（macOS 为 `Option+C`），右上角都会弹出剪贴板面板。
 
 它支持：
 
@@ -188,7 +188,7 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 ## English
 
-Copy Selected Name is an Obsidian desktop plugin for quickly turning selected files or folders into AI-friendly mention text with `Alt+C`, such as:
+Copy Selected Name is an Obsidian desktop plugin for quickly turning selected files or folders into AI-friendly mention text with `Alt+C` on Windows/Linux or `Option+C` on macOS, such as:
 
 ```text
 @01_Example.md 
@@ -244,9 +244,9 @@ Then enable `Copy Selected Name` in Obsidian.
 
 ## Features
 
-- Single `Alt+C`: overwrite the plugin clipboard with selected file or folder mentions.
-- Double `Alt+C` within 1 second: append new mentions to the current plugin clipboard.
-- Triple `Alt+C` within 1 second: open the overwrite / append / cancel modal.
+- Single `Alt+C` / `Option+C`: overwrite the plugin clipboard with selected file or folder mentions.
+- Double `Alt+C` / `Option+C` within 1 second: append new mentions to the current plugin clipboard.
+- Triple `Alt+C` / `Option+C` within 1 second: open the overwrite / append / cancel modal.
 - Multi-selection support: copy several selected files or folders at once.
 - Claudian support: insert mentions directly into the focused Claudian input textarea.
 - Editable plugin clipboard panel: view, edit, clear, and reuse clipboard text.

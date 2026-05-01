@@ -140,7 +140,8 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   }
 
   isAltC(event) {
-    return event.key.toLowerCase() === "c" &&
+    const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
+    return (event.code === "KeyC" || key === "c") &&
       event.altKey &&
       !event.ctrlKey &&
       !event.metaKey &&
@@ -985,7 +986,7 @@ class CopyModeModal extends Modal {
     editorHost.style.background = "var(--background-primary)";
     this.plugin.renderClipboardEditor(editorHost);
 
-    const title = contentEl.createEl("h2", { text: "这次 Alt+C 怎么处理？" });
+    const title = contentEl.createEl("h2", { text: "这次 Alt/Option+C 怎么处理？" });
     title.style.marginBottom = "12px";
 
     const preview = contentEl.createEl("div", { text: this.text });
