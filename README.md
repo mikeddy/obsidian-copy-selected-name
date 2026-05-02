@@ -142,6 +142,8 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 在 Obsidian 中进入 `设置 -> 第三方插件 -> Copy Selected Name`，可以修改：
 
 - 操作快捷键：点击“录制快捷键”，按下你想使用的任意组合键。
+- Windows 快捷键：单独配置 Windows/Linux 下使用的快捷键。
+- Mac 快捷键：单独配置 macOS 下使用的快捷键。
 - 连按判断间隔：设置多少毫秒内算作双击或三击。
 - 单击动作：可选智能覆盖、覆盖、追加、弹窗或不执行。
 - 双击动作：可选覆盖、追加、弹窗或不执行。
@@ -275,7 +277,8 @@ The plugin clipboard is separate from the system clipboard. The system clipboard
 
 Open `Settings -> Community plugins -> Copy Selected Name` to customize:
 
-- Shortcut: record any key combination.
+- Windows shortcut: configure the shortcut used on Windows/Linux.
+- Mac shortcut: configure the shortcut used on macOS.
 - Press interval: define how quickly repeated presses become double or triple presses.
 - Single press action: smart overwrite, overwrite, append, modal, or no action.
 - Double press action: overwrite, append, modal, or no action.

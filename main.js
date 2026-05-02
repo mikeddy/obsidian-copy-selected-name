@@ -9,14 +9,25 @@ const PANEL_BASE_TEXTAREA_HEIGHT = 108;
 const PANEL_MAX_TEXTAREA_HEIGHT = PANEL_BASE_TEXTAREA_HEIGHT * 2.5;
 const POINTER_SELECTION_FRESH_MS = 5000;
 const DEFAULT_SETTINGS = {
-  shortcut: {
-    code: "KeyC",
-    key: "c",
-    alt: true,
-    ctrl: false,
-    meta: false,
-    shift: false,
-    label: "Alt/Option+C"
+  shortcuts: {
+    windows: {
+      code: "KeyC",
+      key: "c",
+      alt: true,
+      ctrl: false,
+      meta: false,
+      shift: false,
+      label: "Alt+C"
+    },
+    mac: {
+      code: "KeyC",
+      key: "c",
+      alt: true,
+      ctrl: false,
+      meta: false,
+      shift: false,
+      label: "Option+C"
+    }
   },
   pressWindowMs: DEFAULT_PRESS_WINDOW_MS,
   pressActions: {
@@ -124,17 +135,21 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   }
 
   normalizeSettings(settings = {}) {
-    const shortcut = settings.shortcut || {};
+    const legacyShortcut = settings.shortcut || null;
+    const shortcuts = settings.shortcuts || {};
     const pressActions = settings.pressActions || {};
     return {
-      shortcut: {
-        code: typeof shortcut.code === "string" && shortcut.code ? shortcut.code : DEFAULT_SETTINGS.shortcut.code,
-        key: typeof shortcut.key === "string" && shortcut.key ? shortcut.key : DEFAULT_SETTINGS.shortcut.key,
-        alt: typeof shortcut.alt === "boolean" ? shortcut.alt : DEFAULT_SETTINGS.shortcut.alt,
-        ctrl: typeof shortcut.ctrl === "boolean" ? shortcut.ctrl : DEFAULT_SETTINGS.shortcut.ctrl,
-        meta: typeof shortcut.meta === "boolean" ? shortcut.meta : DEFAULT_SETTINGS.shortcut.meta,
-        shift: typeof shortcut.shift === "boolean" ? shortcut.shift : DEFAULT_SETTINGS.shortcut.shift,
-        label: typeof shortcut.label === "string" && shortcut.label ? shortcut.label : DEFAULT_SETTINGS.shortcut.label
+      shortcuts: {
+        windows: this.normalizeShortcut(
+          shortcuts.windows || legacyShortcut || {},
+          DEFAULT_SETTINGS.shortcuts.windows,
+          "windows"
+        ),
+        mac: this.normalizeShortcut(
+          shortcuts.mac || legacyShortcut || {},
+          DEFAULT_SETTINGS.shortcuts.mac,
+          "mac"
+        )
       },
       pressWindowMs: this.normalizePressWindowMs(settings.pressWindowMs),
       pressActions: {
@@ -143,6 +158,20 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
         triple: this.normalizePressAction(pressActions.triple, DEFAULT_SETTINGS.pressActions.triple)
       }
     };
+  }
+
+  normalizeShortcut(shortcut = {}, fallback = DEFAULT_SETTINGS.shortcuts.windows, platformKey = "windows") {
+    const normalized = {
+      code: typeof shortcut.code === "string" && shortcut.code ? shortcut.code : fallback.code,
+      key: typeof shortcut.key === "string" && shortcut.key ? shortcut.key : fallback.key,
+      alt: typeof shortcut.alt === "boolean" ? shortcut.alt : fallback.alt,
+      ctrl: typeof shortcut.ctrl === "boolean" ? shortcut.ctrl : fallback.ctrl,
+      meta: typeof shortcut.meta === "boolean" ? shortcut.meta : fallback.meta,
+      shift: typeof shortcut.shift === "boolean" ? shortcut.shift : fallback.shift,
+      label: ""
+    };
+    normalized.label = this.formatShortcut(normalized, platformKey);
+    return normalized;
   }
 
   normalizePressWindowMs(value) {
@@ -215,7 +244,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   }
 
   isConfiguredHotkey(event) {
-    const shortcut = this.settings?.shortcut || DEFAULT_SETTINGS.shortcut;
+    const shortcut = this.getActiveShortcut();
     const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
     const shortcutKey = typeof shortcut.key === "string" ? shortcut.key.toLowerCase() : "";
     const codeMatches = Boolean(shortcut.code) && event.code === shortcut.code;
@@ -226,6 +255,25 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       Boolean(event.metaKey) === Boolean(shortcut.meta) &&
       Boolean(event.shiftKey) === Boolean(shortcut.shift) &&
       !event.isComposing;
+  }
+
+  getActiveShortcut() {
+    return this.getShortcutForPlatform(this.getCurrentPlatformKey());
+  }
+
+  getShortcutForPlatform(platformKey) {
+    const normalizedPlatform = platformKey === "mac" ? "mac" : "windows";
+    return this.settings?.shortcuts?.[normalizedPlatform] || DEFAULT_SETTINGS.shortcuts[normalizedPlatform];
+  }
+
+  getCurrentPlatformKey() {
+    const platform = typeof navigator !== "undefined" && navigator.platform
+      ? navigator.platform
+      : "";
+    const userAgent = typeof navigator !== "undefined" && navigator.userAgent
+      ? navigator.userAgent
+      : "";
+    return /Mac|iPhone|iPad|iPod/i.test(`${platform} ${userAgent}`) ? "mac" : "windows";
   }
 
   async handleMentionHotkey(text, selectionKey = text) {
@@ -332,7 +380,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     }
   }
 
-  shortcutFromEvent(event) {
+  shortcutFromEvent(event, platformKey = this.getCurrentPlatformKey()) {
     if (this.isModifierOnlyKey(event.code)) {
       return null;
     }
@@ -346,7 +394,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       shift: Boolean(event.shiftKey),
       label: ""
     };
-    shortcut.label = this.formatShortcut(shortcut);
+    shortcut.label = this.formatShortcut(shortcut, platformKey);
     return shortcut;
   }
 
@@ -363,7 +411,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     ].includes(code);
   }
 
-  formatShortcut(shortcut = this.settings?.shortcut) {
+  formatShortcut(shortcut = this.getActiveShortcut(), platformKey = this.getCurrentPlatformKey()) {
     const parts = [];
     if (shortcut.ctrl) {
       parts.push("Ctrl");
@@ -372,7 +420,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       parts.push("Cmd");
     }
     if (shortcut.alt) {
-      parts.push("Alt/Option");
+      parts.push(platformKey === "mac" ? "Option" : "Alt");
     }
     if (shortcut.shift) {
       parts.push("Shift");
@@ -1399,30 +1447,18 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
       text: "配置复制文件/文件夹引用时使用的快捷键，以及单击、双击、三击时分别执行的动作。"
     });
 
-    new Setting(containerEl)
-      .setName("操作快捷键")
-      .setDesc("点击“录制快捷键”，然后按下想使用的组合键。Windows/Linux 默认 Alt+C，macOS 默认 Option+C。")
-      .addButton((button) => {
-        button
-          .setButtonText(this.plugin.formatShortcut(this.plugin.settings.shortcut))
-          .setTooltip("当前快捷键")
-          .setDisabled(true);
-      })
-      .addButton((button) => {
-        button
-          .setButtonText("录制快捷键")
-          .setCta()
-          .onClick(() => this.startShortcutCapture(button));
-      })
-      .addButton((button) => {
-        button
-          .setButtonText("恢复默认")
-          .onClick(async () => {
-            this.plugin.settings.shortcut = { ...DEFAULT_SETTINGS.shortcut };
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
+    this.addShortcutSetting(
+      containerEl,
+      "windows",
+      "Windows 快捷键",
+      "Windows/Linux 下使用这一栏。默认 Alt+C。"
+    );
+    this.addShortcutSetting(
+      containerEl,
+      "mac",
+      "Mac 快捷键",
+      "macOS 下使用这一栏。默认 Option+C。"
+    );
 
     new Setting(containerEl)
       .setName("连按判断间隔")
@@ -1486,10 +1522,42 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
       });
   }
 
-  startShortcutCapture(button) {
+  addShortcutSetting(containerEl, platformKey, name, desc) {
+    new Setting(containerEl)
+      .setName(name)
+      .setDesc(desc)
+      .addButton((button) => {
+        button
+          .setButtonText(this.plugin.formatShortcut(
+            this.plugin.getShortcutForPlatform(platformKey),
+            platformKey
+          ))
+          .setTooltip("当前快捷键")
+          .setDisabled(true);
+      })
+      .addButton((button) => {
+        button
+          .setButtonText("录制快捷键")
+          .setCta()
+          .onClick(() => this.startShortcutCapture(button, platformKey));
+      })
+      .addButton((button) => {
+        button
+          .setButtonText("恢复默认")
+          .onClick(async () => {
+            this.plugin.settings.shortcuts[platformKey] = {
+              ...DEFAULT_SETTINGS.shortcuts[platformKey]
+            };
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+  }
+
+  startShortcutCapture(button, platformKey) {
     this.stopShortcutCapture();
     button.setButtonText("按下新的快捷键...");
-    new Notice("Press the new shortcut. Press Esc to cancel.");
+    new Notice(`Press the new ${platformKey === "mac" ? "Mac" : "Windows"} shortcut. Press Esc to cancel.`);
 
     const handler = async (event) => {
       event.preventDefault();
@@ -1504,13 +1572,13 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
         return;
       }
 
-      const shortcut = this.plugin.shortcutFromEvent(event);
+      const shortcut = this.plugin.shortcutFromEvent(event, platformKey);
       if (!shortcut) {
         new Notice("Please include a non-modifier key");
         return;
       }
 
-      this.plugin.settings.shortcut = shortcut;
+      this.plugin.settings.shortcuts[platformKey] = shortcut;
       await this.plugin.saveSettings();
       new Notice(`Shortcut set to ${shortcut.label}`);
       this.stopShortcutCapture();
