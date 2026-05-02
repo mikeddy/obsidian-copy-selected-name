@@ -1,12 +1,37 @@
-const { Modal, Notice, Plugin, TFile, TFolder } = require("obsidian");
+const { Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } = require("obsidian");
 
 const FILE_EXPLORER_SELECTOR = '.workspace-leaf-content[data-type="file-explorer"]';
 const EXPLORER_ITEM_SELECTOR = ".nav-file-title, .nav-folder-title, .tree-item-self";
 const CLAUDIAN_INPUT_SELECTOR = "textarea.claudian-input";
-const DOUBLE_PRESS_MS = 1000;
+const DEFAULT_PRESS_WINDOW_MS = 1000;
 const PANEL_HIDE_MS = 3000;
 const PANEL_BASE_TEXTAREA_HEIGHT = 108;
 const PANEL_MAX_TEXTAREA_HEIGHT = PANEL_BASE_TEXTAREA_HEIGHT * 2.5;
+const POINTER_SELECTION_FRESH_MS = 5000;
+const DEFAULT_SETTINGS = {
+  shortcut: {
+    code: "KeyC",
+    key: "c",
+    alt: true,
+    ctrl: false,
+    meta: false,
+    shift: false,
+    label: "Alt/Option+C"
+  },
+  pressWindowMs: DEFAULT_PRESS_WINDOW_MS,
+  pressActions: {
+    single: "smart-overwrite",
+    double: "append",
+    triple: "modal"
+  }
+};
+const PRESS_ACTION_LABELS = {
+  "smart-overwrite": "智能覆盖（追加链后询问）",
+  overwrite: "覆盖剪贴板",
+  append: "追加到剪贴板",
+  modal: "弹出覆盖/追加选择框",
+  none: "不执行操作"
+};
 const SELECTED_ITEM_SELECTORS = [
   ".nav-file-title.is-selected",
   ".nav-folder-title.is-selected",
@@ -28,6 +53,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   async onload() {
     this.lastSelectedItem = null;
     this.lastSelectedItems = [];
+    this.lastPointerSelectedItem = null;
+    this.lastPointerAt = 0;
+    this.lastPointerUsedModifier = false;
     this.lastPressAt = 0;
     this.lastPressText = "";
     this.lastPressKey = "";
@@ -48,7 +76,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.clipboardPanelFocused = false;
     this.copyModeModal = null;
     const data = await this.loadData();
+    this.data = data || {};
     this.history = Array.isArray(data?.history) ? data.history : [];
+    this.settings = this.normalizeSettings(data?.settings);
 
     this.registerDomEvent(
       document,
@@ -81,15 +111,60 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
         }
 
         if (!checking) {
-          void this.performOverwrite(
-            this.buildMentionTextFromItems(selectedItems),
-            this.buildSelectionKey(selectedItems)
-          );
+          const text = this.buildMentionTextFromItems(selectedItems);
+          const selectionKey = this.buildSelectionKey(selectedItems);
+          void this.handleMentionHotkey(text, selectionKey);
         }
 
         return true;
       }
     });
+
+    this.addSettingTab(new CopySelectedNameSettingTab(this.app, this));
+  }
+
+  normalizeSettings(settings = {}) {
+    const shortcut = settings.shortcut || {};
+    const pressActions = settings.pressActions || {};
+    return {
+      shortcut: {
+        code: typeof shortcut.code === "string" && shortcut.code ? shortcut.code : DEFAULT_SETTINGS.shortcut.code,
+        key: typeof shortcut.key === "string" && shortcut.key ? shortcut.key : DEFAULT_SETTINGS.shortcut.key,
+        alt: typeof shortcut.alt === "boolean" ? shortcut.alt : DEFAULT_SETTINGS.shortcut.alt,
+        ctrl: typeof shortcut.ctrl === "boolean" ? shortcut.ctrl : DEFAULT_SETTINGS.shortcut.ctrl,
+        meta: typeof shortcut.meta === "boolean" ? shortcut.meta : DEFAULT_SETTINGS.shortcut.meta,
+        shift: typeof shortcut.shift === "boolean" ? shortcut.shift : DEFAULT_SETTINGS.shortcut.shift,
+        label: typeof shortcut.label === "string" && shortcut.label ? shortcut.label : DEFAULT_SETTINGS.shortcut.label
+      },
+      pressWindowMs: this.normalizePressWindowMs(settings.pressWindowMs),
+      pressActions: {
+        single: this.normalizePressAction(pressActions.single, DEFAULT_SETTINGS.pressActions.single),
+        double: this.normalizePressAction(pressActions.double, DEFAULT_SETTINGS.pressActions.double),
+        triple: this.normalizePressAction(pressActions.triple, DEFAULT_SETTINGS.pressActions.triple)
+      }
+    };
+  }
+
+  normalizePressWindowMs(value) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+      return DEFAULT_SETTINGS.pressWindowMs;
+    }
+
+    return Math.min(Math.max(Math.round(numberValue), 200), 3000);
+  }
+
+  async savePluginData() {
+    this.data = {
+      ...(this.data || {}),
+      settings: this.settings,
+      history: this.history
+    };
+    await this.saveData(this.data);
+  }
+
+  async saveSettings() {
+    await this.savePluginData();
   }
 
   onunload() {
@@ -119,7 +194,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   }
 
   handleAltC(event) {
-    if (!this.isAltC(event)) {
+    if (!this.isConfiguredHotkey(event)) {
       return;
     }
 
@@ -139,13 +214,17 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     void this.handleMentionHotkey(text, selectionKey);
   }
 
-  isAltC(event) {
+  isConfiguredHotkey(event) {
+    const shortcut = this.settings?.shortcut || DEFAULT_SETTINGS.shortcut;
     const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
-    return (event.code === "KeyC" || key === "c") &&
-      event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.shiftKey &&
+    const shortcutKey = typeof shortcut.key === "string" ? shortcut.key.toLowerCase() : "";
+    const codeMatches = Boolean(shortcut.code) && event.code === shortcut.code;
+    const keyMatches = Boolean(shortcutKey) && key === shortcutKey;
+    return (codeMatches || keyMatches) &&
+      Boolean(event.altKey) === Boolean(shortcut.alt) &&
+      Boolean(event.ctrlKey) === Boolean(shortcut.ctrl) &&
+      Boolean(event.metaKey) === Boolean(shortcut.meta) &&
+      Boolean(event.shiftKey) === Boolean(shortcut.shift) &&
       !event.isComposing;
   }
 
@@ -157,28 +236,30 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     const pressKey = selectionKey || text;
     this.showClipboardPanel(this.chainActive && this.chainText ? this.chainText : text);
     const now = Date.now();
+    const pressWindowMs = this.getPressWindowMs();
     const isSameSelectionPress = pressKey === this.lastPressKey;
-    const isQuickPress = isSameSelectionPress && this.lastPressAt > 0 && now - this.lastPressAt < DOUBLE_PRESS_MS;
+    const isQuickPress = isSameSelectionPress && this.lastPressAt > 0 && now - this.lastPressAt < pressWindowMs;
     this.pressCount = isQuickPress ? this.pressCount + 1 : 1;
     const isDoublePress = this.pressCount === 2;
     const isTriplePress = this.pressCount >= 3;
+    const pressAction = this.getPressAction(this.pressCount);
 
     if (this.pendingSingleTimer) {
       this.clearPendingSingle();
     }
 
     if (isTriplePress) {
-      this.openCopyModeModal(text, pressKey);
+      await this.executePressAction(pressAction, text, pressKey, { pressCount: 3 });
       this.pressCount = 0;
     } else if (isDoublePress) {
       const hasSnapshotForPress = this.lastSingleSnapshotForKey === pressKey;
-      await this.performAppend(text, {
+      await this.executePressAction(pressAction, text, pressKey, {
+        pressCount: 2,
         baseText: hasSnapshotForPress ? this.lastSingleSnapshotText : "",
         baseLastKey: hasSnapshotForPress ? this.lastSingleSnapshotLastKey : "",
-        selectionKey: pressKey,
         duplicateStartsChainOnly: true
       });
-    } else if (this.chainActive) {
+    } else if (this.chainActive && pressAction === "smart-overwrite") {
       this.pendingSingleRequest = { text, selectionKey: pressKey };
       this.showClipboardPanel(this.chainText || text);
       this.pendingSingleTimer = window.setTimeout(() => {
@@ -187,17 +268,155 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
         if (request) {
           this.openCopyModeModal(request.text, request.selectionKey);
         }
-      }, DOUBLE_PRESS_MS);
+      }, pressWindowMs);
     } else {
       this.lastSingleSnapshotText = this.chainText || this.currentClipboardText || "";
       this.lastSingleSnapshotLastKey = this.chainLastKey || "";
       this.lastSingleSnapshotForKey = pressKey;
-      await this.performOverwrite(text, pressKey);
+      await this.executePressAction(pressAction, text, pressKey, { pressCount: 1 });
     }
 
     this.lastPressAt = now;
     this.lastPressText = text;
     this.lastPressKey = pressKey;
+  }
+
+  getPressWindowMs() {
+    const value = Number(this.settings?.pressWindowMs);
+    if (!Number.isFinite(value)) {
+      return DEFAULT_PRESS_WINDOW_MS;
+    }
+
+    return Math.min(Math.max(Math.round(value), 200), 3000);
+  }
+
+  getPressAction(pressCount) {
+    const actions = this.settings?.pressActions || DEFAULT_SETTINGS.pressActions;
+    if (pressCount >= 3) {
+      return this.normalizePressAction(actions.triple, DEFAULT_SETTINGS.pressActions.triple);
+    }
+
+    if (pressCount === 2) {
+      return this.normalizePressAction(actions.double, DEFAULT_SETTINGS.pressActions.double);
+    }
+
+    return this.normalizePressAction(actions.single, DEFAULT_SETTINGS.pressActions.single);
+  }
+
+  normalizePressAction(action, fallback) {
+    return Object.prototype.hasOwnProperty.call(PRESS_ACTION_LABELS, action) ? action : fallback;
+  }
+
+  async executePressAction(action, text, selectionKey, options = {}) {
+    switch (this.normalizePressAction(action, DEFAULT_SETTINGS.pressActions.single)) {
+      case "overwrite":
+      case "smart-overwrite":
+        await this.performOverwrite(text, selectionKey);
+        break;
+      case "append":
+        await this.performAppend(text, {
+          baseText: options.baseText || "",
+          baseLastKey: options.baseLastKey || "",
+          selectionKey,
+          duplicateStartsChainOnly: Boolean(options.duplicateStartsChainOnly)
+        });
+        break;
+      case "modal":
+        this.openCopyModeModal(text, selectionKey);
+        break;
+      case "none":
+        new Notice("Copy Selected Name: no action configured for this press");
+        break;
+      default:
+        await this.performOverwrite(text, selectionKey);
+    }
+  }
+
+  shortcutFromEvent(event) {
+    if (this.isModifierOnlyKey(event.code)) {
+      return null;
+    }
+
+    const shortcut = {
+      code: event.code || "",
+      key: typeof event.key === "string" ? event.key.toLowerCase() : "",
+      alt: Boolean(event.altKey),
+      ctrl: Boolean(event.ctrlKey),
+      meta: Boolean(event.metaKey),
+      shift: Boolean(event.shiftKey),
+      label: ""
+    };
+    shortcut.label = this.formatShortcut(shortcut);
+    return shortcut;
+  }
+
+  isModifierOnlyKey(code) {
+    return [
+      "AltLeft",
+      "AltRight",
+      "ControlLeft",
+      "ControlRight",
+      "MetaLeft",
+      "MetaRight",
+      "ShiftLeft",
+      "ShiftRight"
+    ].includes(code);
+  }
+
+  formatShortcut(shortcut = this.settings?.shortcut) {
+    const parts = [];
+    if (shortcut.ctrl) {
+      parts.push("Ctrl");
+    }
+    if (shortcut.meta) {
+      parts.push("Cmd");
+    }
+    if (shortcut.alt) {
+      parts.push("Alt/Option");
+    }
+    if (shortcut.shift) {
+      parts.push("Shift");
+    }
+
+    parts.push(this.formatShortcutKey(shortcut));
+    return parts.filter(Boolean).join("+");
+  }
+
+  formatShortcutKey(shortcut) {
+    const code = shortcut?.code || "";
+    const key = shortcut?.key || "";
+    if (code.startsWith("Key") && code.length === 4) {
+      return code.slice(3).toUpperCase();
+    }
+    if (code.startsWith("Digit") && code.length === 6) {
+      return code.slice(5);
+    }
+
+    const specialCodes = {
+      Space: "Space",
+      Escape: "Esc",
+      Enter: "Enter",
+      Tab: "Tab",
+      Backspace: "Backspace",
+      Delete: "Delete",
+      ArrowUp: "ArrowUp",
+      ArrowDown: "ArrowDown",
+      ArrowLeft: "ArrowLeft",
+      ArrowRight: "ArrowRight"
+    };
+    if (specialCodes[code]) {
+      return specialCodes[code];
+    }
+
+    if (/^F\d{1,2}$/.test(code)) {
+      return code;
+    }
+
+    if (key && key.length === 1) {
+      return key.toUpperCase();
+    }
+
+    return code || key;
   }
 
   clearPendingSingle() {
@@ -253,6 +472,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     if (selected) {
       this.lastSelectedItem = selected;
       this.lastSelectedItems = [selected];
+      this.lastPointerSelectedItem = selected;
+      this.lastPointerAt = Date.now();
+      this.lastPointerUsedModifier = event.ctrlKey || event.metaKey || event.shiftKey;
     }
 
     window.setTimeout(() => this.refreshLastSelectedItems(), 0);
@@ -260,6 +482,13 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
   getSelectedExplorerItems() {
     const selectedItems = this.resolveExplorerItems(this.findSelectedExplorerItems());
+    const pointerItem = this.getFreshPointerSelectedItem();
+    if (pointerItem && !this.selectionContainsItem(selectedItems, pointerItem)) {
+      this.lastSelectedItem = pointerItem;
+      this.lastSelectedItems = [pointerItem];
+      return [pointerItem];
+    }
+
     if (selectedItems.length > 0) {
       this.lastSelectedItem = selectedItems[selectedItems.length - 1];
       this.lastSelectedItems = selectedItems;
@@ -284,6 +513,27 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     }
 
     return [];
+  }
+
+  getFreshPointerSelectedItem() {
+    if (this.lastPointerUsedModifier || !this.lastPointerSelectedItem || this.lastPointerAt <= 0) {
+      return null;
+    }
+
+    if (Date.now() - this.lastPointerAt > POINTER_SELECTION_FRESH_MS) {
+      return null;
+    }
+
+    return this.itemStillExists(this.lastPointerSelectedItem) ? this.lastPointerSelectedItem : null;
+  }
+
+  selectionContainsItem(items, targetItem) {
+    const targetKey = targetItem.path || targetItem.name;
+    if (!targetKey) {
+      return false;
+    }
+
+    return items.some((item) => (item.path || item.name) === targetKey);
   }
 
   refreshLastSelectedItems() {
@@ -535,7 +785,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       mode,
       createdAt: Date.now()
     });
-    await this.saveData({ history: this.history });
+    await this.savePluginData();
   }
 
   showClipboardPanel(text) {
@@ -1087,7 +1337,7 @@ class CopyModeModal extends Modal {
           if (this.plugin.history[index]) {
             this.plugin.history[index].text = editor.value;
           }
-          await this.plugin.saveData({ history: this.plugin.history });
+          await this.plugin.savePluginData();
           textWrap.empty();
           this.renderHistoryText(textWrap, record);
           editButton.setText("编辑");
@@ -1124,6 +1374,159 @@ class CopyModeModal extends Modal {
       return new Date(timestamp).toLocaleString();
     } catch (error) {
       return "";
+    }
+  }
+}
+
+class CopySelectedNameSettingTab extends PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+    this.captureCleanup = null;
+  }
+
+  hide() {
+    this.stopShortcutCapture();
+  }
+
+  display() {
+    this.stopShortcutCapture();
+    const { containerEl } = this;
+    containerEl.replaceChildren();
+
+    containerEl.createEl("h2", { text: "Copy Selected Name" });
+    containerEl.createEl("p", {
+      text: "配置复制文件/文件夹引用时使用的快捷键，以及单击、双击、三击时分别执行的动作。"
+    });
+
+    new Setting(containerEl)
+      .setName("操作快捷键")
+      .setDesc("点击“录制快捷键”，然后按下想使用的组合键。Windows/Linux 默认 Alt+C，macOS 默认 Option+C。")
+      .addButton((button) => {
+        button
+          .setButtonText(this.plugin.formatShortcut(this.plugin.settings.shortcut))
+          .setTooltip("当前快捷键")
+          .setDisabled(true);
+      })
+      .addButton((button) => {
+        button
+          .setButtonText("录制快捷键")
+          .setCta()
+          .onClick(() => this.startShortcutCapture(button));
+      })
+      .addButton((button) => {
+        button
+          .setButtonText("恢复默认")
+          .onClick(async () => {
+            this.plugin.settings.shortcut = { ...DEFAULT_SETTINGS.shortcut };
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("连按判断间隔")
+      .setDesc("两次或三次按键之间小于这个时间，就会被识别为双击或三击。范围 200-3000 毫秒。")
+      .addText((text) => {
+        text
+          .setPlaceholder(String(DEFAULT_SETTINGS.pressWindowMs))
+          .setValue(String(this.plugin.getPressWindowMs()))
+          .onChange(async (value) => {
+            const nextValue = this.plugin.normalizePressWindowMs(value);
+            this.plugin.settings.pressWindowMs = nextValue;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.type = "number";
+        text.inputEl.min = "200";
+        text.inputEl.max = "3000";
+        text.inputEl.step = "100";
+      });
+
+    this.addActionSetting(containerEl, "single", "单击动作", "按一次快捷键时执行的动作。");
+    this.addActionSetting(containerEl, "double", "双击动作", "在连按判断间隔内按两次快捷键时执行的动作。");
+    this.addActionSetting(containerEl, "triple", "三击动作", "在连按判断间隔内按三次快捷键时执行的动作。");
+
+    new Setting(containerEl)
+      .setName("恢复默认频率动作")
+      .setDesc("恢复为：单击智能覆盖、双击追加、三击弹窗。")
+      .addButton((button) => {
+        button
+          .setButtonText("恢复默认")
+          .onClick(async () => {
+            this.plugin.settings.pressWindowMs = DEFAULT_SETTINGS.pressWindowMs;
+            this.plugin.settings.pressActions = { ...DEFAULT_SETTINGS.pressActions };
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
+    const note = containerEl.createEl("p");
+    note.style.color = "var(--text-muted)";
+    note.style.fontSize = "12px";
+    note.setText("补充：这个插件也会在 Obsidian 的“快捷键/Hotkeys”列表里显示命令。你可以用 Obsidian 原生快捷键绑定触发同一个命令；单击/双击/三击的动作仍以这里的设置为准。");
+  }
+
+  addActionSetting(containerEl, key, name, desc) {
+    new Setting(containerEl)
+      .setName(name)
+      .setDesc(desc)
+      .addDropdown((dropdown) => {
+        for (const [action, label] of Object.entries(PRESS_ACTION_LABELS)) {
+          dropdown.addOption(action, label);
+        }
+        dropdown
+          .setValue(this.plugin.settings.pressActions[key])
+          .onChange(async (value) => {
+            this.plugin.settings.pressActions[key] = this.plugin.normalizePressAction(
+              value,
+              DEFAULT_SETTINGS.pressActions[key]
+            );
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
+  startShortcutCapture(button) {
+    this.stopShortcutCapture();
+    button.setButtonText("按下新的快捷键...");
+    new Notice("Press the new shortcut. Press Esc to cancel.");
+
+    const handler = async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
+
+      if (event.key === "Escape") {
+        this.stopShortcutCapture();
+        this.display();
+        return;
+      }
+
+      const shortcut = this.plugin.shortcutFromEvent(event);
+      if (!shortcut) {
+        new Notice("Please include a non-modifier key");
+        return;
+      }
+
+      this.plugin.settings.shortcut = shortcut;
+      await this.plugin.saveSettings();
+      new Notice(`Shortcut set to ${shortcut.label}`);
+      this.stopShortcutCapture();
+      this.display();
+    };
+
+    document.addEventListener("keydown", handler, true);
+    this.captureCleanup = () => {
+      document.removeEventListener("keydown", handler, true);
+      this.captureCleanup = null;
+    };
+  }
+
+  stopShortcutCapture() {
+    if (this.captureCleanup) {
+      this.captureCleanup();
     }
   }
 }

@@ -137,6 +137,18 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 @A文件.md @B文件.md 
 ```
 
+### 自定义快捷键和频率
+
+在 Obsidian 中进入 `设置 -> 第三方插件 -> Copy Selected Name`，可以修改：
+
+- 操作快捷键：点击“录制快捷键”，按下你想使用的任意组合键。
+- 连按判断间隔：设置多少毫秒内算作双击或三击。
+- 单击动作：可选智能覆盖、覆盖、追加、弹窗或不执行。
+- 双击动作：可选覆盖、追加、弹窗或不执行。
+- 三击动作：可选覆盖、追加、弹窗或不执行。
+
+插件命令也会出现在 Obsidian 的 `设置 -> 快捷键` 中。你可以在那里绑定原生命令快捷键；单击、双击、三击的动作仍以插件设置页为准。
+
 ### Claudian 输入框联动
 
 如果 Claudian 插件界面已经打开，并且光标正处在 Claudian 输入框中：
@@ -248,6 +260,8 @@ Then enable `Copy Selected Name` in Obsidian.
 - Double `Alt+C` / `Option+C` within 1 second: append new mentions to the current plugin clipboard.
 - Triple `Alt+C` / `Option+C` within 1 second: open the overwrite / append / cancel modal.
 - Multi-selection support: copy several selected files or folders at once.
+- Custom shortcut recording from the plugin settings tab.
+- Configurable single / double / triple press actions.
 - Claudian support: insert mentions directly into the focused Claudian input textarea.
 - Editable plugin clipboard panel: view, edit, clear, and reuse clipboard text.
 - Obsidian URL conversion: toggle mention text into Obsidian URLs and back.
@@ -256,6 +270,18 @@ Then enable `Copy Selected Name` in Obsidian.
 - Editable history: copy, edit, and save previous copy records.
 
 The plugin clipboard is separate from the system clipboard. The system clipboard is only written by the `转成 ObsidianURL并复制` button.
+
+## Settings
+
+Open `Settings -> Community plugins -> Copy Selected Name` to customize:
+
+- Shortcut: record any key combination.
+- Press interval: define how quickly repeated presses become double or triple presses.
+- Single press action: smart overwrite, overwrite, append, modal, or no action.
+- Double press action: overwrite, append, modal, or no action.
+- Triple press action: overwrite, append, modal, or no action.
+
+The plugin command also appears in Obsidian's native `Settings -> Hotkeys` list. Native hotkey bindings trigger the same command, while press-frequency behavior follows the plugin settings tab.
 
 ## Development
 
