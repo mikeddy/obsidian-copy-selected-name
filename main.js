@@ -698,7 +698,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return "";
     }
 
-    return `${cleanNames.map((name) => `@${name}`).join(" ")} `;
+    return cleanNames.map((name) => `@${name} `).join("\n");
   }
 
   buildMentionTextFromItems(items) {
@@ -770,7 +770,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return text;
     }
 
-    return `${baseText.trimEnd()} ${text.trimStart()}`;
+    return `${baseText.trimEnd()}\n${text.trimStart()}`;
   }
 
   async outputText(text, options = {}) {
