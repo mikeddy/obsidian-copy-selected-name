@@ -111,13 +111,16 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 - 前面自动加 `@`
 - 保留 `.md`
 - 末尾保留一个空格
+- 多个文件时一行一个文件，每一行末尾仍保留一个空格
 
 ### 多个文件
 
 选中多个文件后按 `Alt+C`（macOS 为 `Option+C`），会一次性复制所有选中文件名：
 
 ```text
-@A文件.md @B文件.md @C文件.md 
+@A文件.md 
+@B文件.md 
+@C文件.md 
 ```
 
 ### 单按、双按、三连按
@@ -134,7 +137,8 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 4. 最终插件剪贴板会是：
 
 ```text
-@A文件.md @B文件.md 
+@A文件.md 
+@B文件.md 
 ```
 
 ### 自定义快捷键和频率
@@ -261,7 +265,7 @@ Then enable `Copy Selected Name` in Obsidian.
 - Single `Alt+C` / `Option+C`: overwrite the plugin clipboard with selected file or folder mentions.
 - Double `Alt+C` / `Option+C` within 1 second: append new mentions to the current plugin clipboard.
 - Triple `Alt+C` / `Option+C` within 1 second: open the overwrite / append / cancel modal.
-- Multi-selection support: copy several selected files or folders at once.
+- Multi-selection support: copy several selected files or folders at once, one mention per line.
 - Custom shortcut recording from the plugin settings tab.
 - Configurable single / double / triple press actions.
 - Claudian support: insert mentions directly into the focused Claudian input textarea.
