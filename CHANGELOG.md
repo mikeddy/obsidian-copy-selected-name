@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0
+
+- Added a "转成磁盘路径" toggle button in the clipboard panel that converts mentions to full disk paths and back, mirroring the Obsidian URL toggle behavior.
+- Added a "复制磁盘路径" button that copies the disk-path conversion to the system clipboard without changing the panel content.
+- Renamed the "转成 ObsidianURL并复制" button to "复制 Obsidian URL"; it now copies directly when the panel already contains Obsidian URLs.
+- Reorganized the clipboard panel buttons into a convert row and a copy/clear row to reduce clutter.
+- Conversions now accept any of the three formats (mentions, Obsidian URLs, disk paths) as input.
+
 ## 1.6.0
 
 - Added editable history records in the overwrite/append modal.

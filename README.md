@@ -19,7 +19,7 @@ Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中
 - 在做短视频拆解、选题策划、项目复盘、客户资料整理时，快速收集多个相关文件名。
 - 需要在普通 `@文件名.md` 格式和 `obsidian://open?...` Obsidian URL 格式之间来回转换。
 
-插件使用自己的内部剪贴板，不会默认覆盖系统剪贴板。只有点击“转成 ObsidianURL并复制”时，才会把内容写入系统剪贴板。
+插件使用自己的内部剪贴板，不会默认覆盖系统剪贴板。只有点击“复制 Obsidian URL”或“复制磁盘路径”时，才会把内容写入系统剪贴板。
 
 ## 联系方式
 
@@ -175,9 +175,10 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 - 查看当前插件剪贴板内容
 - 直接编辑剪贴板内容
 - 清空剪贴板
-- 转成 Obsidian URL
-- 再次点击后转回普通 `@文件名.md` 格式
-- 生成 Obsidian URL 并复制到系统剪贴板
+- 转成 Obsidian URL（再次点击转回普通 `@文件名.md` 格式）
+- 转成磁盘路径（如 `D:\库\笔记.md`，再次点击转回普通格式）
+- 复制 Obsidian URL：把转换结果直接写入系统剪贴板，不改动面板内容
+- 复制磁盘路径：把完整磁盘路径直接写入系统剪贴板，不改动面板内容
 
 面板默认 3 秒后自动消失。鼠标悬停或正在编辑时不会消失，移开后重新开始 3 秒倒计时。
 
@@ -271,11 +272,12 @@ Then enable `Copy Selected Name` in Obsidian.
 - Claudian support: insert mentions directly into the focused Claudian input textarea.
 - Editable plugin clipboard panel: view, edit, clear, and reuse clipboard text.
 - Obsidian URL conversion: toggle mention text into Obsidian URLs and back.
-- Copy Obsidian URLs to the system clipboard without changing the plugin clipboard editor.
+- Disk path conversion: toggle mention text into full disk paths and back.
+- Copy Obsidian URLs or full disk paths to the system clipboard without changing the plugin clipboard editor.
 - Paste-once behavior: pasting outside the plugin clipboard panel clears the plugin clipboard after insertion.
 - Editable history: copy, edit, and save previous copy records.
 
-The plugin clipboard is separate from the system clipboard. The system clipboard is only written by the `转成 ObsidianURL并复制` button.
+The plugin clipboard is separate from the system clipboard. The system clipboard is only written by the `复制 Obsidian URL` and `复制磁盘路径` buttons.
 
 ## Settings
 

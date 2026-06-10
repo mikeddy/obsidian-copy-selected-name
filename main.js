@@ -796,7 +796,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       this.chainActive = Boolean(this.currentClipboardText);
     }
     this.showClipboardPanel(this.currentClipboardText);
-    this.updateObsidianUrlToggleButtons();
+    this.updateConversionToggleButtons();
   }
 
   async clearClipboardFromEditor() {
@@ -817,7 +817,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.lastSingleSnapshotLastKey = "";
     this.lastSingleSnapshotForKey = "";
     this.syncClipboardEditors("");
-    this.updateObsidianUrlToggleButtons();
+    this.updateConversionToggleButtons();
     if (options.showNotice) {
       new Notice("Plugin clipboard cleared");
     }
@@ -912,14 +912,14 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       closeButton.addEventListener("click", () => this.hideClipboardPanel());
     }
 
-    const buttons = container.createDiv();
-    buttons.style.display = "flex";
-    buttons.style.flexWrap = "wrap";
-    buttons.style.gap = "8px";
-    buttons.style.alignItems = "center";
-    buttons.style.marginBottom = "8px";
+    const convertRow = container.createDiv();
+    convertRow.style.display = "flex";
+    convertRow.style.flexWrap = "wrap";
+    convertRow.style.gap = "8px";
+    convertRow.style.alignItems = "center";
+    convertRow.style.marginBottom = "6px";
 
-    const urlButton = buttons.createEl("button", {
+    const urlButton = convertRow.createEl("button", {
       text: this.getObsidianUrlToggleLabel(this.currentClipboardText)
     });
     urlButton.addClass("copy-selected-name-url-toggle");
@@ -930,7 +930,25 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       }
     });
 
-    const copyUrlButton = buttons.createEl("button", { text: "转成 ObsidianURL并复制" });
+    const diskButton = convertRow.createEl("button", {
+      text: this.getDiskPathToggleLabel(this.currentClipboardText)
+    });
+    diskButton.addClass("copy-selected-name-disk-toggle");
+    diskButton.addEventListener("click", () => {
+      const textarea = container.querySelector("textarea.copy-selected-name-editor");
+      if (textarea instanceof HTMLTextAreaElement) {
+        void this.toggleEditorDiskPath(textarea);
+      }
+    });
+
+    const actionRow = container.createDiv();
+    actionRow.style.display = "flex";
+    actionRow.style.flexWrap = "wrap";
+    actionRow.style.gap = "8px";
+    actionRow.style.alignItems = "center";
+    actionRow.style.marginBottom = "8px";
+
+    const copyUrlButton = actionRow.createEl("button", { text: "复制 Obsidian URL" });
     copyUrlButton.addEventListener("click", () => {
       const textarea = container.querySelector("textarea.copy-selected-name-editor");
       if (textarea instanceof HTMLTextAreaElement) {
@@ -938,7 +956,16 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       }
     });
 
-    const clearButton = buttons.createEl("button", { text: "清空" });
+    const copyDiskButton = actionRow.createEl("button", { text: "复制磁盘路径" });
+    copyDiskButton.addEventListener("click", () => {
+      const textarea = container.querySelector("textarea.copy-selected-name-editor");
+      if (textarea instanceof HTMLTextAreaElement) {
+        void this.copyEditorAsDiskPaths(textarea);
+      }
+    });
+
+    const clearButton = actionRow.createEl("button", { text: "清空" });
+    clearButton.style.marginLeft = "auto";
     clearButton.addEventListener("click", () => {
       void this.clearClipboardFromEditor();
     });
@@ -968,6 +995,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       this.chainText = textarea.value;
       this.chainActive = Boolean(textarea.value);
       urlButton.setText(this.getObsidianUrlToggleLabel(textarea.value));
+      diskButton.setText(this.getDiskPathToggleLabel(textarea.value));
       this.resizeClipboardPanelTextarea(textarea);
       this.syncClipboardEditors(textarea.value, textarea);
       this.refreshClipboardPanelTimer();
@@ -981,9 +1009,16 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     return this.isObsidianUrlText(text) ? "转回普通格式" : "转成 ObsidianURL";
   }
 
-  updateObsidianUrlToggleButtons() {
+  getDiskPathToggleLabel(text) {
+    return this.isDiskPathText(text) ? "转回普通格式" : "转成磁盘路径";
+  }
+
+  updateConversionToggleButtons() {
     for (const button of document.querySelectorAll(".copy-selected-name-url-toggle")) {
       button.setText(this.getObsidianUrlToggleLabel(this.currentClipboardText));
+    }
+    for (const button of document.querySelectorAll(".copy-selected-name-disk-toggle")) {
+      button.setText(this.getDiskPathToggleLabel(this.currentClipboardText));
     }
   }
 
@@ -1085,19 +1120,38 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return;
     }
 
+    this.applyEditorConversion(textarea, nextText);
+  }
+
+  async toggleEditorDiskPath(textarea) {
+    const nextText = this.isDiskPathText(textarea.value)
+      ? this.getMentionTextFromDiskPaths(textarea.value)
+      : this.getDiskPathTextFromText(textarea.value);
+
+    if (!nextText) {
+      new Notice("No matching files found");
+      return;
+    }
+
+    this.applyEditorConversion(textarea, nextText);
+  }
+
+  applyEditorConversion(textarea, nextText) {
     textarea.value = nextText;
     this.currentClipboardText = nextText;
     this.chainText = nextText;
     this.chainActive = Boolean(nextText);
     this.syncClipboardEditors(nextText, textarea);
     this.resizeClipboardPanelTextarea(textarea);
-    this.updateObsidianUrlToggleButtons();
+    this.updateConversionToggleButtons();
     this.refreshClipboardPanelTimer();
     new Notice("Converted");
   }
 
   async copyEditorAsObsidianUrls(textarea) {
-    const text = this.getObsidianUrlTextFromMentions(textarea.value);
+    const text = this.isObsidianUrlText(textarea.value)
+      ? textarea.value.trim()
+      : this.getObsidianUrlTextFromMentions(textarea.value);
     if (!text) {
       new Notice("No matching files found");
       return;
@@ -1105,6 +1159,19 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
     await this.writeSystemClipboard(text);
     new Notice("Copied Obsidian URL");
+  }
+
+  async copyEditorAsDiskPaths(textarea) {
+    const text = this.isDiskPathText(textarea.value)
+      ? textarea.value.trim()
+      : this.getDiskPathTextFromText(textarea.value);
+    if (!text) {
+      new Notice("No matching files found");
+      return;
+    }
+
+    await this.writeSystemClipboard(text);
+    new Notice("Copied disk path");
   }
 
   getObsidianUrlTextFromMentions(text) {
@@ -1124,10 +1191,96 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   }
 
   getObsidianUrlsFromText(text) {
-    return this.extractMentionNames(text)
+    return this.extractNamesFromAnyFormat(text)
       .map((name) => this.resolveMentionToVaultItem(name))
       .filter(Boolean)
       .map((item) => this.buildObsidianUrl(item));
+  }
+
+  getDiskPathTextFromText(text) {
+    if (!this.getVaultBasePath()) {
+      new Notice("Cannot resolve vault disk path");
+      return "";
+    }
+
+    const paths = this.extractNamesFromAnyFormat(text)
+      .map((name) => this.resolveMentionToVaultItem(name))
+      .filter(Boolean)
+      .map((item) => this.buildDiskPath(item.path))
+      .filter(Boolean);
+    return paths.length === 0 ? "" : paths.join("\n");
+  }
+
+  getMentionTextFromDiskPaths(text) {
+    const names = this.extractDiskPaths(text)
+      .map((diskPath) => this.getVaultRelativePath(diskPath))
+      .filter(Boolean)
+      .map((relPath) => {
+        const item = this.app.vault.getAbstractFileByPath(relPath);
+        return item ? item.path : relPath;
+      });
+    return names.length === 0 ? "" : this.buildMentionText(names);
+  }
+
+  isDiskPathText(text) {
+    return this.extractDiskPaths(text).length > 0 && this.extractMentionNames(text).length === 0;
+  }
+
+  extractDiskPaths(text) {
+    return text.split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(line));
+  }
+
+  extractNamesFromAnyFormat(text) {
+    if (this.isDiskPathText(text)) {
+      return this.extractDiskPaths(text)
+        .map((diskPath) => this.getVaultRelativePath(diskPath))
+        .filter(Boolean);
+    }
+
+    if (this.isObsidianUrlText(text)) {
+      return this.extractObsidianUrls(text)
+        .map((url) => this.resolveObsidianUrlToName(url))
+        .filter(Boolean);
+    }
+
+    return this.extractMentionNames(text);
+  }
+
+  getVaultBasePath() {
+    const adapter = this.app.vault.adapter;
+    if (adapter && typeof adapter.getBasePath === "function") {
+      return adapter.getBasePath() || "";
+    }
+
+    return "";
+  }
+
+  buildDiskPath(relPath) {
+    const basePath = this.getVaultBasePath();
+    if (!basePath) {
+      return "";
+    }
+
+    const separator = basePath.includes("\\") || /^[A-Za-z]:/.test(basePath) ? "\\" : "/";
+    const trimmedBase = basePath.replace(/[\\/]+$/, "");
+    return `${trimmedBase}${separator}${relPath.split("/").join(separator)}`;
+  }
+
+  getVaultRelativePath(diskPath) {
+    const basePath = this.getVaultBasePath();
+    if (!basePath) {
+      return "";
+    }
+
+    const normalizedBase = basePath.replace(/\\/g, "/").replace(/\/+$/, "");
+    const normalizedPath = diskPath.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (!normalizedPath.toLowerCase().startsWith(`${normalizedBase.toLowerCase()}/`)) {
+      return "";
+    }
+
+    return normalizedPath.slice(normalizedBase.length + 1);
   }
 
   extractObsidianUrls(text) {
