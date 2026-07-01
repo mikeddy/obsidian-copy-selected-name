@@ -16,10 +16,11 @@ Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中
 
 - 在 Obsidian 里使用 Claudian、Claude、Codex 或其他 AI 对话插件时，快速把当前文件作为上下文引用插入输入框。
 - 同时选择多个笔记文件，把它们整理成一串可直接粘贴给 AI 的文件名引用。
+- 按 `Alt+X`（macOS 为 `Option+X`）直接复制选中文件或文件夹的真实磁盘路径到系统剪贴板。
 - 在做短视频拆解、选题策划、项目复盘、客户资料整理时，快速收集多个相关文件名。
 - 需要在普通 `@文件名.md` 格式和 `obsidian://open?...` Obsidian URL 格式之间来回转换。
 
-插件使用自己的内部剪贴板，不会默认覆盖系统剪贴板。只有点击“复制 Obsidian URL”或“复制磁盘路径”时，才会把内容写入系统剪贴板。
+`Alt+C` / `Option+C` 使用插件自己的内部剪贴板，不会默认覆盖系统剪贴板。`Alt+X` / `Option+X` 是真实系统复制，可以直接粘贴到记事本、浏览器、外部文件或其他应用。
 
 ## 联系方式
 
@@ -123,6 +124,16 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 @C文件.md 
 ```
 
+### 复制物理磁盘路径
+
+选中文件或文件夹后按 `Alt+X`（macOS 为 `Option+X`），会把真实磁盘路径直接写入系统剪贴板：
+
+```text
+/Users/you/Obsidian/项目/A文件.md
+```
+
+多选时会一行一个路径。这个功能不使用插件内部剪贴板，可以直接粘贴到浏览器、记事本、终端或外部文件中。
+
 ### 单按、双按、三连按
 
 - 单按 `Alt+C`（macOS 为 `Option+C`）：覆盖插件内部剪贴板。
@@ -145,9 +156,9 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 
 在 Obsidian 中进入 `设置 -> 第三方插件 -> Copy Selected Name`，可以修改：
 
-- 操作快捷键：点击“录制快捷键”，按下你想使用的任意组合键。
-- Windows 快捷键：单独配置 Windows/Linux 下使用的快捷键。
-- Mac 快捷键：单独配置 macOS 下使用的快捷键。
+- 文件名引用复制快捷键：默认 Windows/Linux 为 `Alt+C`，macOS 为 `Option+C`。
+- 物理磁盘路径复制快捷键：默认 Windows/Linux 为 `Alt+X`，macOS 为 `Option+X`。
+- 每个功能都可以分别配置 Windows 快捷键和 Mac 快捷键。
 - 连按判断间隔：设置多少毫秒内算作双击或三击。
 - 单击动作：可选智能覆盖、覆盖、追加、弹窗或不执行。
 - 双击动作：可选覆盖、追加、弹窗或不执行。

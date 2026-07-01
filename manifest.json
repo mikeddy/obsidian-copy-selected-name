@@ -1,9 +1,9 @@
 {
     "id":  "copy-selected-name",
     "name":  "Copy Selected Name",
-    "version":  "1.7.0",
+    "version":  "1.7.1",
     "minAppVersion":  "1.4.5",
-    "description":  "Copy selected files or folders as editable @mentions with Alt+C, with append mode, history, and vault URL conversion.",
+    "description":  "Copy selected files or folders as @mentions with Alt+C, disk paths with Alt+X, history, and vault URL conversion.",
     "author":  "mikeddy",
     "authorUrl":  "https://github.com/mikeddy",
     "isDesktopOnly":  true

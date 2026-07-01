@@ -8,25 +8,50 @@ const PANEL_HIDE_MS = 3000;
 const PANEL_BASE_TEXTAREA_HEIGHT = 108;
 const PANEL_MAX_TEXTAREA_HEIGHT = PANEL_BASE_TEXTAREA_HEIGHT * 2.5;
 const POINTER_SELECTION_FRESH_MS = 5000;
+const CLIPBOARD_PASTE_ARM_MS = 15000;
+const MAX_HISTORY_ENTRIES = 1000;
+const DISK_PATH_LINE_PATTERN = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
 const DEFAULT_SETTINGS = {
   shortcuts: {
-    windows: {
-      code: "KeyC",
-      key: "c",
-      alt: true,
-      ctrl: false,
-      meta: false,
-      shift: false,
-      label: "Alt+C"
+    mention: {
+      windows: {
+        code: "KeyC",
+        key: "c",
+        alt: true,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        label: "Alt+C"
+      },
+      mac: {
+        code: "KeyC",
+        key: "c",
+        alt: true,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        label: "Option+C"
+      }
     },
-    mac: {
-      code: "KeyC",
-      key: "c",
-      alt: true,
-      ctrl: false,
-      meta: false,
-      shift: false,
-      label: "Option+C"
+    diskPath: {
+      windows: {
+        code: "KeyX",
+        key: "x",
+        alt: true,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        label: "Alt+X"
+      },
+      mac: {
+        code: "KeyX",
+        key: "x",
+        alt: true,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        label: "Option+X"
+      }
     }
   },
   pressWindowMs: DEFAULT_PRESS_WINDOW_MS,
@@ -80,6 +105,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.chainLastKey = "";
     this.pressCount = 0;
     this.currentClipboardText = "";
+    this.clipboardArmedAt = 0;
     this.clipboardPanelEl = null;
     this.clipboardPanelTextarea = null;
     this.clipboardPanelHideTimer = null;
@@ -101,7 +127,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.registerDomEvent(
       document,
       "keydown",
-      (event) => this.handleAltC(event),
+      (event) => this.handleKeyboardShortcut(event),
       true
     );
 
@@ -131,25 +157,58 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       }
     });
 
+    this.addCommand({
+      id: "copy-selected-file-or-folder-disk-path",
+      name: "Copy selected file or folder disk path",
+      checkCallback: (checking) => {
+        const selectedItems = this.getSelectedExplorerItems();
+        if (selectedItems.length === 0) {
+          return false;
+        }
+
+        if (!checking) {
+          void this.copyDiskPathsFromItems(selectedItems);
+        }
+
+        return true;
+      }
+    });
+
     this.addSettingTab(new CopySelectedNameSettingTab(this.app, this));
   }
 
   normalizeSettings(settings = {}) {
     const legacyShortcut = settings.shortcut || null;
     const shortcuts = settings.shortcuts || {};
+    const mentionShortcuts = shortcuts.mention || {};
+    const diskPathShortcuts = shortcuts.diskPath || settings.diskPathShortcuts || {};
     const pressActions = settings.pressActions || {};
     return {
       shortcuts: {
-        windows: this.normalizeShortcut(
-          shortcuts.windows || legacyShortcut || {},
-          DEFAULT_SETTINGS.shortcuts.windows,
-          "windows"
-        ),
-        mac: this.normalizeShortcut(
-          shortcuts.mac || legacyShortcut || {},
-          DEFAULT_SETTINGS.shortcuts.mac,
-          "mac"
-        )
+        mention: {
+          windows: this.normalizeShortcut(
+            mentionShortcuts.windows || shortcuts.windows || legacyShortcut || {},
+            DEFAULT_SETTINGS.shortcuts.mention.windows,
+            "windows"
+          ),
+          mac: this.normalizeShortcut(
+            mentionShortcuts.mac || shortcuts.mac || legacyShortcut || {},
+            DEFAULT_SETTINGS.shortcuts.mention.mac,
+            "mac"
+          )
+        },
+        diskPath: {
+          windows: this.normalizeShortcut(
+            diskPathShortcuts.windows || {},
+            DEFAULT_SETTINGS.shortcuts.diskPath.windows,
+            "windows"
+          ),
+          mac: this.normalizeShortcut(
+            diskPathShortcuts.mac || {},
+            DEFAULT_SETTINGS.shortcuts.diskPath.mac,
+            "mac"
+          )
+        }
       },
       pressWindowMs: this.normalizePressWindowMs(settings.pressWindowMs),
       pressActions: {
@@ -160,7 +219,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     };
   }
 
-  normalizeShortcut(shortcut = {}, fallback = DEFAULT_SETTINGS.shortcuts.windows, platformKey = "windows") {
+  normalizeShortcut(shortcut = {}, fallback = DEFAULT_SETTINGS.shortcuts.mention.windows, platformKey = "windows") {
     const normalized = {
       code: typeof shortcut.code === "string" && shortcut.code ? shortcut.code : fallback.code,
       key: typeof shortcut.key === "string" && shortcut.key ? shortcut.key : fallback.key,
@@ -208,7 +267,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return;
     }
 
-    if (!this.currentClipboardText) {
+    if (!this.isClipboardArmed()) {
       return;
     }
 
@@ -222,29 +281,69 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     void this.resetClipboardState({ showNotice: true });
   }
 
-  handleAltC(event) {
-    if (!this.isConfiguredHotkey(event)) {
+  isClipboardArmed() {
+    if (!this.currentClipboardText) {
+      return false;
+    }
+
+    // 面板仍然可见时内容视为活跃（hover/focus 会保持它常驻），始终允许粘贴。
+    if (this.clipboardPanelEl) {
+      return true;
+    }
+
+    // 面板隐藏后给一个有限的时效，避免很久以前的一次 Alt+C 静默劫持用户真正想要
+    // 的系统剪贴板粘贴。
+    if (!this.clipboardArmedAt) {
+      return false;
+    }
+
+    return Date.now() - this.clipboardArmedAt <= CLIPBOARD_PASTE_ARM_MS;
+  }
+
+  handleKeyboardShortcut(event) {
+    if (this.isConfiguredHotkey(event, "mention")) {
+      this.handleMentionShortcut(event);
       return;
     }
 
+    if (this.isConfiguredHotkey(event, "diskPath")) {
+      this.handleDiskPathShortcut(event);
+    }
+  }
+
+  handleMentionShortcut(event) {
     const selectedItems = this.getSelectedExplorerItems();
     if (selectedItems.length === 0) {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    if (typeof event.stopImmediatePropagation === "function") {
-      event.stopImmediatePropagation();
-    }
+    this.stopHotkeyEvent(event);
 
     const text = this.buildMentionTextFromItems(selectedItems);
     const selectionKey = this.buildSelectionKey(selectedItems);
     void this.handleMentionHotkey(text, selectionKey);
   }
 
-  isConfiguredHotkey(event) {
-    const shortcut = this.getActiveShortcut();
+  handleDiskPathShortcut(event) {
+    const selectedItems = this.getSelectedExplorerItems();
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    this.stopHotkeyEvent(event);
+    void this.copyDiskPathsFromItems(selectedItems);
+  }
+
+  stopHotkeyEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  isConfiguredHotkey(event, shortcutGroup = "mention") {
+    const shortcut = this.getActiveShortcut(shortcutGroup);
     const key = typeof event.key === "string" ? event.key.toLowerCase() : "";
     const shortcutKey = typeof shortcut.key === "string" ? shortcut.key.toLowerCase() : "";
     const codeMatches = Boolean(shortcut.code) && event.code === shortcut.code;
@@ -257,13 +356,38 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       !event.isComposing;
   }
 
-  getActiveShortcut() {
-    return this.getShortcutForPlatform(this.getCurrentPlatformKey());
+  getActiveShortcut(shortcutGroup = "mention") {
+    return this.getShortcutForPlatform(shortcutGroup, this.getCurrentPlatformKey());
   }
 
-  getShortcutForPlatform(platformKey) {
+  getShortcutForPlatform(shortcutGroup = "mention", platformKey) {
+    if (platformKey === undefined) {
+      platformKey = this.getCurrentPlatformKey();
+    }
+
+    if ((shortcutGroup === "mac" || shortcutGroup === "windows") && arguments.length === 1) {
+      platformKey = shortcutGroup;
+      shortcutGroup = "mention";
+    }
+
+    const normalizedGroup = shortcutGroup === "diskPath" ? "diskPath" : "mention";
     const normalizedPlatform = platformKey === "mac" ? "mac" : "windows";
-    return this.settings?.shortcuts?.[normalizedPlatform] || DEFAULT_SETTINGS.shortcuts[normalizedPlatform];
+    const groupShortcuts = this.settings?.shortcuts?.[normalizedGroup] || DEFAULT_SETTINGS.shortcuts[normalizedGroup];
+    return groupShortcuts?.[normalizedPlatform] || DEFAULT_SETTINGS.shortcuts[normalizedGroup][normalizedPlatform];
+  }
+
+  setShortcutForPlatform(shortcutGroup, platformKey, shortcut) {
+    const normalizedGroup = shortcutGroup === "diskPath" ? "diskPath" : "mention";
+    const normalizedPlatform = platformKey === "mac" ? "mac" : "windows";
+
+    if (!this.settings.shortcuts) {
+      this.settings.shortcuts = {};
+    }
+    if (!this.settings.shortcuts[normalizedGroup]) {
+      this.settings.shortcuts[normalizedGroup] = {};
+    }
+
+    this.settings.shortcuts[normalizedGroup][normalizedPlatform] = shortcut;
   }
 
   getCurrentPlatformKey() {
@@ -288,9 +412,22 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     const isSameSelectionPress = pressKey === this.lastPressKey;
     const isQuickPress = isSameSelectionPress && this.lastPressAt > 0 && now - this.lastPressAt < pressWindowMs;
     this.pressCount = isQuickPress ? this.pressCount + 1 : 1;
-    const isDoublePress = this.pressCount === 2;
-    const isTriplePress = this.pressCount >= 3;
-    const pressAction = this.getPressAction(this.pressCount);
+    const pressCount = this.pressCount;
+    const isDoublePress = pressCount === 2;
+    const isTriplePress = pressCount >= 3;
+    const pressAction = this.getPressAction(pressCount);
+
+    // 连按判断依赖的状态必须在任何 await 之前同步写入。executePressAction 内部会
+    // await 磁盘写入（addHistory → saveData），若把这些赋值留到 await 之后，快速的
+    // 第二次按键（keydown 是新的宏任务）会在第一次写入完成前读到旧值，导致双击/
+    // 三击被误判成单击。
+    this.lastPressAt = now;
+    this.lastPressText = text;
+    this.lastPressKey = pressKey;
+    if (isTriplePress) {
+      // 三击后归零，让下一次快速按键重新从单击开始计数。
+      this.pressCount = 0;
+    }
 
     if (this.pendingSingleTimer) {
       this.clearPendingSingle();
@@ -298,7 +435,6 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
     if (isTriplePress) {
       await this.executePressAction(pressAction, text, pressKey, { pressCount: 3 });
-      this.pressCount = 0;
     } else if (isDoublePress) {
       const hasSnapshotForPress = this.lastSingleSnapshotForKey === pressKey;
       await this.executePressAction(pressAction, text, pressKey, {
@@ -323,10 +459,6 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       this.lastSingleSnapshotForKey = pressKey;
       await this.executePressAction(pressAction, text, pressKey, { pressCount: 1 });
     }
-
-    this.lastPressAt = now;
-    this.lastPressText = text;
-    this.lastPressKey = pressKey;
   }
 
   getPressWindowMs() {
@@ -713,6 +845,44 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       .join("\u001f");
   }
 
+  async copyDiskPathsFromItems(items) {
+    if (!this.getVaultBasePath()) {
+      new Notice("Cannot resolve vault disk path");
+      return;
+    }
+
+    const text = this.buildDiskPathTextFromItems(items);
+    if (!text) {
+      new Notice("No matching files found");
+      return;
+    }
+
+    if (!(await this.writeSystemClipboard(text))) {
+      return;
+    }
+
+    const pathCount = text.split(/\r?\n/).filter(Boolean).length;
+    new Notice(pathCount === 1
+      ? "Copied disk path to system clipboard"
+      : `Copied ${pathCount} disk paths to system clipboard`);
+  }
+
+  buildDiskPathTextFromItems(items) {
+    const paths = items
+      .map((item) => {
+        if (item.path) {
+          return item.path;
+        }
+
+        const vaultItem = item.name ? this.resolveMentionToVaultItem(item.name) : null;
+        return vaultItem ? vaultItem.path : "";
+      })
+      .map((path) => this.buildDiskPath(path))
+      .filter(Boolean);
+
+    return paths.length === 0 ? "" : paths.join("\n");
+  }
+
   async performOverwrite(text, selectionKey = "") {
     if (!text) {
       return;
@@ -806,6 +976,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
   async resetClipboardState(options = {}) {
     this.currentClipboardText = "";
+    this.clipboardArmedAt = 0;
     this.chainText = "";
     this.chainActive = false;
     this.chainLastKey = "";
@@ -833,11 +1004,15 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       mode,
       createdAt: Date.now()
     });
+    if (this.history.length > MAX_HISTORY_ENTRIES) {
+      this.history.splice(0, this.history.length - MAX_HISTORY_ENTRIES);
+    }
     await this.savePluginData();
   }
 
   showClipboardPanel(text) {
     this.currentClipboardText = text;
+    this.clipboardArmedAt = Date.now();
     const panel = this.ensureClipboardPanel();
     this.syncClipboardEditors(text);
 
@@ -992,6 +1167,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
     textarea.addEventListener("input", () => {
       this.currentClipboardText = textarea.value;
+      this.clipboardArmedAt = Date.now();
       this.chainText = textarea.value;
       this.chainActive = Boolean(textarea.value);
       urlButton.setText(this.getObsidianUrlToggleLabel(textarea.value));
@@ -1139,6 +1315,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   applyEditorConversion(textarea, nextText) {
     textarea.value = nextText;
     this.currentClipboardText = nextText;
+    this.clipboardArmedAt = Date.now();
     this.chainText = nextText;
     this.chainActive = Boolean(nextText);
     this.syncClipboardEditors(nextText, textarea);
@@ -1157,8 +1334,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return;
     }
 
-    await this.writeSystemClipboard(text);
-    new Notice("Copied Obsidian URL");
+    if (await this.writeSystemClipboard(text)) {
+      new Notice("Copied Obsidian URL");
+    }
   }
 
   async copyEditorAsDiskPaths(textarea) {
@@ -1170,8 +1348,9 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return;
     }
 
-    await this.writeSystemClipboard(text);
-    new Notice("Copied disk path");
+    if (await this.writeSystemClipboard(text)) {
+      new Notice("Copied disk path");
+    }
   }
 
   getObsidianUrlTextFromMentions(text) {
@@ -1229,23 +1408,44 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   extractDiskPaths(text) {
     return text.split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => /^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(line));
+      .filter((line) => DISK_PATH_LINE_PATTERN.test(line));
   }
 
   extractNamesFromAnyFormat(text) {
-    if (this.isDiskPathText(text)) {
-      return this.extractDiskPaths(text)
-        .map((diskPath) => this.getVaultRelativePath(diskPath))
-        .filter(Boolean);
+    // 逐行解析，允许三种格式（磁盘路径 / Obsidian URL / @mention）混在一起而不丢行。
+    const names = [];
+
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) {
+        continue;
+      }
+
+      if (DISK_PATH_LINE_PATTERN.test(line)) {
+        const relPath = this.getVaultRelativePath(line);
+        if (relPath) {
+          names.push(relPath);
+        }
+        continue;
+      }
+
+      const urlTokens = line.split(/\s+/).filter((part) => part.startsWith("obsidian://"));
+      if (urlTokens.length > 0) {
+        for (const url of urlTokens) {
+          const name = this.resolveObsidianUrlToName(url);
+          if (name) {
+            names.push(name);
+          }
+        }
+        continue;
+      }
+
+      for (const name of this.extractMentionNames(line)) {
+        names.push(name);
+      }
     }
 
-    if (this.isObsidianUrlText(text)) {
-      return this.extractObsidianUrls(text)
-        .map((url) => this.resolveObsidianUrlToName(url))
-        .filter(Boolean);
-    }
-
-    return this.extractMentionNames(text);
+    return names;
   }
 
   getVaultBasePath() {
@@ -1259,7 +1459,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
   buildDiskPath(relPath) {
     const basePath = this.getVaultBasePath();
-    if (!basePath) {
+    if (!basePath || !relPath) {
       return "";
     }
 
@@ -1291,12 +1491,19 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
 
   extractMentionNames(text) {
     const names = [];
-    const regex = /@([^@]+?)(?=\s*@|$)/g;
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      const name = match[1].trim();
-      if (name) {
-        names.push(name);
+    for (const rawLine of text.split(/\r?\n/)) {
+      // 一行内允许多个以空白分隔的 @mention；只在“空白 + @”处切分，这样文件名内部
+      // 出现的 @（前面没有空白）以及名字里的空格都会被保留。
+      for (const chunk of rawLine.split(/\s+(?=@)/)) {
+        const trimmed = chunk.trim();
+        if (!trimmed.startsWith("@")) {
+          continue;
+        }
+
+        const name = trimmed.slice(1).trim();
+        if (name) {
+          names.push(name);
+        }
       }
     }
     return names;
@@ -1357,9 +1564,17 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
   async writeSystemClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch (error) {
-      const { clipboard } = require("electron");
-      clipboard.writeText(text);
+      try {
+        const { clipboard } = require("electron");
+        clipboard.writeText(text);
+        return true;
+      } catch (fallbackError) {
+        console.error("Copy Selected Name: failed to write system clipboard", fallbackError);
+        new Notice("无法写入系统剪贴板");
+        return false;
+      }
     }
   }
 
@@ -1597,19 +1812,25 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Copy Selected Name" });
     containerEl.createEl("p", {
-      text: "配置复制文件/文件夹引用时使用的快捷键，以及单击、双击、三击时分别执行的动作。"
+      text: "配置文件/文件夹引用复制和物理磁盘路径复制使用的快捷键。"
     });
 
+    containerEl.createEl("h3", { text: "文件名引用复制" });
+    containerEl.createEl("p", {
+      text: "Alt+C / Option+C：生成 @文件名 或 @文件夹名，写入插件内部剪贴板，并支持单击、双击、三击动作。"
+    });
     this.addShortcutSetting(
       containerEl,
+      "mention",
       "windows",
-      "Windows 快捷键",
+      "Windows 快捷键（引用复制）",
       "Windows/Linux 下使用这一栏。默认 Alt+C。"
     );
     this.addShortcutSetting(
       containerEl,
+      "mention",
       "mac",
-      "Mac 快捷键",
+      "Mac 快捷键（引用复制）",
       "macOS 下使用这一栏。默认 Option+C。"
     );
 
@@ -1636,7 +1857,7 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
     this.addActionSetting(containerEl, "triple", "三击动作", "在连按判断间隔内按三次快捷键时执行的动作。");
 
     new Setting(containerEl)
-      .setName("恢复默认频率动作")
+      .setName("恢复默认引用复制动作")
       .setDesc("恢复为：单击智能覆盖、双击追加、三击弹窗。")
       .addButton((button) => {
         button
@@ -1649,10 +1870,29 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
           });
       });
 
+    containerEl.createEl("h3", { text: "物理磁盘路径复制" });
+    containerEl.createEl("p", {
+      text: "Alt+X / Option+X：复制选中文件或文件夹的真实磁盘路径，直接写入系统剪贴板。"
+    });
+    this.addShortcutSetting(
+      containerEl,
+      "diskPath",
+      "windows",
+      "Windows 快捷键（磁盘路径复制）",
+      "Windows/Linux 下使用这一栏。默认 Alt+X。"
+    );
+    this.addShortcutSetting(
+      containerEl,
+      "diskPath",
+      "mac",
+      "Mac 快捷键（磁盘路径复制）",
+      "macOS 下使用这一栏。默认 Option+X。"
+    );
+
     const note = containerEl.createEl("p");
     note.style.color = "var(--text-muted)";
     note.style.fontSize = "12px";
-    note.setText("补充：这个插件也会在 Obsidian 的“快捷键/Hotkeys”列表里显示命令。你可以用 Obsidian 原生快捷键绑定触发同一个命令；单击/双击/三击的动作仍以这里的设置为准。");
+    note.setText("补充：这两个功能也会在 Obsidian 的“快捷键/Hotkeys”列表里显示命令。你可以用 Obsidian 原生快捷键绑定触发；引用复制的单击/双击/三击动作仍以这里的设置为准。");
   }
 
   addActionSetting(containerEl, key, name, desc) {
@@ -1675,14 +1915,14 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
       });
   }
 
-  addShortcutSetting(containerEl, platformKey, name, desc) {
+  addShortcutSetting(containerEl, shortcutGroup, platformKey, name, desc) {
     new Setting(containerEl)
       .setName(name)
       .setDesc(desc)
       .addButton((button) => {
         button
           .setButtonText(this.plugin.formatShortcut(
-            this.plugin.getShortcutForPlatform(platformKey),
+            this.plugin.getShortcutForPlatform(shortcutGroup, platformKey),
             platformKey
           ))
           .setTooltip("当前快捷键")
@@ -1692,22 +1932,24 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
         button
           .setButtonText("录制快捷键")
           .setCta()
-          .onClick(() => this.startShortcutCapture(button, platformKey));
+          .onClick(() => this.startShortcutCapture(button, shortcutGroup, platformKey));
       })
       .addButton((button) => {
         button
           .setButtonText("恢复默认")
           .onClick(async () => {
-            this.plugin.settings.shortcuts[platformKey] = {
-              ...DEFAULT_SETTINGS.shortcuts[platformKey]
-            };
+            this.plugin.setShortcutForPlatform(
+              shortcutGroup,
+              platformKey,
+              { ...DEFAULT_SETTINGS.shortcuts[shortcutGroup][platformKey] }
+            );
             await this.plugin.saveSettings();
             this.display();
           });
       });
   }
 
-  startShortcutCapture(button, platformKey) {
+  startShortcutCapture(button, shortcutGroup, platformKey) {
     this.stopShortcutCapture();
     button.setButtonText("按下新的快捷键...");
     new Notice(`Press the new ${platformKey === "mac" ? "Mac" : "Windows"} shortcut. Press Esc to cancel.`);
@@ -1731,7 +1973,7 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
         return;
       }
 
-      this.plugin.settings.shortcuts[platformKey] = shortcut;
+      this.plugin.setShortcutForPlatform(shortcutGroup, platformKey, shortcut);
       await this.plugin.saveSettings();
       new Notice(`Shortcut set to ${shortcut.label}`);
       this.stopShortcutCapture();
