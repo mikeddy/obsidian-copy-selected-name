@@ -1,6 +1,6 @@
 {
     "name":  "obsidian-copy-selected-name",
-    "version":  "1.7.1",
+    "version":  "1.7.2",
     "description":  "Copy selected files or folders as @mentions with Alt+C, disk paths with Alt+X, history, and vault URL conversion.",
     "main":  "main.js",
     "scripts":  {
