@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.0
+
+- `Alt+X` / `Option+X` now supports quick double presses, mirroring the `Alt+C` double-press behavior: a double press appends the current selection's disk paths to the previously copied paths in the system clipboard instead of overwriting them.
+- Appended disk paths are deduplicated line by line, and the press window shares the existing 连按判断间隔 setting.
+
 ## 1.7.0
 
 - Added a "转成磁盘路径" toggle button in the clipboard panel that converts mentions to full disk paths and back, mirroring the Obsidian URL toggle behavior.

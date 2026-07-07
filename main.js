@@ -104,6 +104,12 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     this.chainText = "";
     this.chainLastKey = "";
     this.pressCount = 0;
+    this.diskPressCount = 0;
+    this.lastDiskPressAt = 0;
+    this.lastDiskPressKey = "";
+    this.diskChainText = "";
+    this.diskSingleSnapshotText = "";
+    this.diskSingleSnapshotForKey = "";
     this.currentClipboardText = "";
     this.clipboardArmedAt = 0;
     this.clipboardPanelEl = null;
@@ -167,7 +173,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
         }
 
         if (!checking) {
-          void this.copyDiskPathsFromItems(selectedItems);
+          void this.handleDiskPathHotkey(selectedItems);
         }
 
         return true;
@@ -331,7 +337,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
     }
 
     this.stopHotkeyEvent(event);
-    void this.copyDiskPathsFromItems(selectedItems);
+    void this.handleDiskPathHotkey(selectedItems);
   }
 
   stopHotkeyEvent(event) {
@@ -845,7 +851,7 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       .join("\u001f");
   }
 
-  async copyDiskPathsFromItems(items) {
+  async handleDiskPathHotkey(items) {
     if (!this.getVaultBasePath()) {
       new Notice("Cannot resolve vault disk path");
       return;
@@ -857,11 +863,57 @@ module.exports = class CopySelectedNamePlugin extends Plugin {
       return;
     }
 
+    // 与 Alt+C 相同的连按判定；状态必须在任何 await 之前同步写入，否则快速的
+    // 第二次按键会读到旧值而被误判成单击。
+    const pressKey = this.buildSelectionKey(items);
+    const now = Date.now();
+    const isQuickPress = pressKey === this.lastDiskPressKey &&
+      this.lastDiskPressAt > 0 &&
+      now - this.lastDiskPressAt < this.getPressWindowMs();
+    this.diskPressCount = isQuickPress ? this.diskPressCount + 1 : 1;
+    const isMultiPress = this.diskPressCount >= 2;
+    this.lastDiskPressAt = now;
+    this.lastDiskPressKey = pressKey;
+
+    if (isMultiPress) {
+      // 双击追加：以单击覆盖之前的快照为基础，把这次的路径接到后面，
+      // 效果上等于撤销刚才那次单击覆盖再追加（对齐 Alt+C 的双击行为）。
+      const hasSnapshotForPress = this.diskSingleSnapshotForKey === pressKey;
+      const baseText = hasSnapshotForPress ? this.diskSingleSnapshotText : this.diskChainText;
+      this.diskChainText = this.appendDiskPathText(baseText, text);
+      await this.writeDiskPathsToClipboard(this.diskChainText, { appended: true });
+      return;
+    }
+
+    this.diskSingleSnapshotText = this.diskChainText;
+    this.diskSingleSnapshotForKey = pressKey;
+    this.diskChainText = text;
+    await this.writeDiskPathsToClipboard(text, { appended: false });
+  }
+
+  appendDiskPathText(baseText, text) {
+    const lines = String(baseText || "").split(/\r?\n/).filter(Boolean);
+    const seen = new Set(lines);
+    for (const line of text.split(/\r?\n/).filter(Boolean)) {
+      if (!seen.has(line)) {
+        seen.add(line);
+        lines.push(line);
+      }
+    }
+    return lines.join("\n");
+  }
+
+  async writeDiskPathsToClipboard(text, options = {}) {
     if (!(await this.writeSystemClipboard(text))) {
       return;
     }
 
     const pathCount = text.split(/\r?\n/).filter(Boolean).length;
+    if (options.appended) {
+      new Notice(`Appended disk path (${pathCount} in system clipboard)`);
+      return;
+    }
+
     new Notice(pathCount === 1
       ? "Copied disk path to system clipboard"
       : `Copied ${pathCount} disk paths to system clipboard`);
@@ -1836,7 +1888,7 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("连按判断间隔")
-      .setDesc("两次或三次按键之间小于这个时间，就会被识别为双击或三击。范围 200-3000 毫秒。")
+      .setDesc("两次或三次按键之间小于这个时间，就会被识别为双击或三击（引用复制和磁盘路径复制共用这个间隔）。范围 200-3000 毫秒。")
       .addText((text) => {
         text
           .setPlaceholder(String(DEFAULT_SETTINGS.pressWindowMs))
@@ -1872,7 +1924,7 @@ class CopySelectedNameSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h3", { text: "物理磁盘路径复制" });
     containerEl.createEl("p", {
-      text: "Alt+X / Option+X：复制选中文件或文件夹的真实磁盘路径，直接写入系统剪贴板。"
+      text: "Alt+X / Option+X：复制选中文件或文件夹的真实磁盘路径，直接写入系统剪贴板。单击覆盖；和 Alt+C 一样，在连按判断间隔内双击会把这次的路径追加到上一次复制的路径后面，方便一次攒出多个路径。"
     });
     this.addShortcutSetting(
       containerEl,

@@ -16,7 +16,7 @@ Copy Selected Name 是一个 Obsidian 桌面端插件，用于在文件列表中
 
 - 在 Obsidian 里使用 Claudian、Claude、Codex 或其他 AI 对话插件时，快速把当前文件作为上下文引用插入输入框。
 - 同时选择多个笔记文件，把它们整理成一串可直接粘贴给 AI 的文件名引用。
-- 按 `Alt+X`（macOS 为 `Option+X`）直接复制选中文件或文件夹的真实磁盘路径到系统剪贴板。
+- 按 `Alt+X`（macOS 为 `Option+X`）直接复制选中文件或文件夹的真实磁盘路径到系统剪贴板；双按 `Alt+X` 会把这次的路径追加到上一次复制的路径后面。
 - 在做短视频拆解、选题策划、项目复盘、客户资料整理时，快速收集多个相关文件名。
 - 需要在普通 `@文件名.md` 格式和 `obsidian://open?...` Obsidian URL 格式之间来回转换。
 
@@ -133,6 +133,19 @@ git clone https://github.com/mikeddy/obsidian-copy-selected-name.git copy-select
 ```
 
 多选时会一行一个路径。这个功能不使用插件内部剪贴板，可以直接粘贴到浏览器、记事本、终端或外部文件中。
+
+和 `Alt+C` 一样，`Alt+X` 也支持双按追加：在连按判断间隔内双按 `Alt+X`（macOS 为 `Option+X`），会把这次选中的磁盘路径追加到上一次复制的路径后面，而不是覆盖。例如：
+
+1. 在 A 文件上按一次 `Alt+X`，系统剪贴板是 A 的路径。
+2. 切换到 B 文件，双按 `Alt+X`。
+3. 系统剪贴板变成：
+
+```text
+/Users/you/Obsidian/项目/A文件.md
+/Users/you/Obsidian/项目/B文件.md
+```
+
+追加时会自动去重，同一个路径不会出现两行。单按 `Alt+X` 仍然是覆盖，会重新开始攒路径。
 
 ### 单按、双按、三连按
 
